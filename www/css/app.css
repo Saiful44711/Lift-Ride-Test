@@ -154,3 +154,12 @@ input:disabled { opacity: .7; }
 #evTbl th, #evTbl td, #pkTbl th, #pkTbl td, #rawTbl th, #rawTbl td, #soundTbl th, #soundTbl td, #cmpRuns td, #cmpRec td, #cmpRuns th, #cmpRec th { white-space: normal; font-size: .84rem; padding: 7px 4px; }
 .cmp-cb { flex: none; }
 #cmpChart { height: 280px; margin-top: 10px; }
+
+/* ---- v2.2.1: bigger charts on PC ---- */
+@media (min-width: 900px) {
+  .charts { grid-template-columns: repeat(auto-fit, minmax(640px, 1fr)); gap: 14px; }
+  .charts .chart { height: 360px; }
+  .charts.stacked .chart { height: 400px; }
+}
+@media (min-width: 1200px) { .app { max-width: 1560px; } .charts .chart { height: 400px; } .charts.stacked .chart { height: 440px; } }
+@media (min-width: 1700px) { .app { max-width: 1840px; } .charts .chart { height: 440px; } .charts.stacked .chart { height: 480px; } }
