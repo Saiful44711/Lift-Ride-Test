@@ -1,7 +1,7 @@
 /* sw.js — makes the web app installable on a PC and usable offline (app files only).
  * Network first, so an updated version always wins when online. Cloud calls (script.google.com) are never touched.
  * Design & Developed by Md. Saiful Islam */
-var CACHE = 'lift-ride-test-v2.2.0';
+var CACHE = 'lift-ride-test-v2.2.1';
 var FILES = ['./', 'index.html', 'config.js', 'build-info.js', 'manifest.webmanifest', 'css/app.css', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/core.js', 'js/source.js', 'js/cloudlogic.js', 'js/backend.js', 'js/charts.js', 'js/chartui.js', 'js/mic.js', 'js/update.js', 'js/pdf.js', 'js/report.js', 'js/store.js', 'js/sensors.js', 'js/app.js'];
 
