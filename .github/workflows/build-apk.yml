@@ -1,0 +1,170 @@
+# Lift Ride Test — APK build (GitHub Actions)
+# Design & Developed by Md. Saiful Islam
+#
+# * সবসময় কাজ করা debug APK বানায়  → Artifact: LiftRideTest-debug-apk
+# * Secrets যোগ করলে signed release APK-ও বানায় → Artifact: LiftRideTest-release-apk
+# * Android SDK / build-tools-এর কোনো সংস্করণ এখানে হাতে বসানো নেই:
+#   প্রজেক্টের android/variables.gradle থেকে পড়া হয় ও runner-এ যা আছে তা দেখে মিলিয়ে নেওয়া হয়।
+# * Node সংস্করণ package.json-এর "engines" থেকে, Java সংস্করণ .java-version ফাইল থেকে আসে।
+
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'tests/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # ঐচ্ছিক — Settings → Secrets and variables → Actions-এ যোগ করলে signed release বানাবে
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+      - name: 1. কোড নামানো
+        uses: actions/checkout@v4
+
+      - name: 2. প্রয়োজনীয় ফাইল আছে কি না যাচাই
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=ফাইল যাচাই ব্যর্থ::উপরের লাইনে কোন ফাইল নেই তা লেখা আছে। repository-র মূল ফোল্ডারে ফাইলগুলো আপলোড হয়েছে কি না দেখুন (README-র ধাপ ২)।"' ERR
+          for f in package.json capacitor.config.json .java-version www/index.html native/LiftSensorPlugin.java native/MainActivity.java scripts/inject-native.sh scripts/sdk-check.sh; do
+            if [ ! -f "$f" ]; then echo "নেই: $f"; exit 1; fi
+          done
+          echo "সব ফাইল আছে ✓"
+
+      - name: 3. Node সেটআপ (package.json engines থেকে)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+
+      - name: 4. Java সেটআপ (.java-version থেকে)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version-file: .java-version
+
+      - name: 5. npm প্যাকেজ ইনস্টল
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=npm install ব্যর্থ::প্যাকেজ সংস্করণ না মিললে README-র সমস্যা-সমাধান সারণি দেখুন (সারি: npm ERESOLVE / ETARGET)।"' ERR
+          node --version
+          npm --version
+          npm install --no-audit --no-fund 2>&1 | tee npm-install.log
+
+      - name: 6. Android প্ল্যাটফর্ম তৈরি
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=cap add android ব্যর্থ::Capacitor CLI-র বার্তা উপরে দেখুন। Node/Java সংস্করণ মিলছে কি না যাচাই করুন।"' ERR
+          if [ -d android ]; then
+            echo "android ফোল্ডার আগে থেকেই আছে — নতুন করে তৈরি করা হলো না"
+          else
+            npx cap add android
+          fi
+          ls android
+
+      - name: 7. Native sensor plugin বসানো
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=plugin বসানো ব্যর্থ::native/ ফোল্ডারের Java ফাইল ও capacitor.config.json-এর appId মিলিয়ে দেখুন।"' ERR
+          bash scripts/inject-native.sh .
+
+      - name: 8. ওয়েব ফাইল Android-এ সিঙ্ক
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=cap sync ব্যর্থ::www/index.html আছে কি না ও npm install সফল হয়েছে কি না দেখুন।"' ERR
+          npx cap sync android
+
+      - name: 9. Android SDK যাচাই (প্রয়োজন ও আছে — মিলিয়ে দেখা)
+        run: bash scripts/sdk-check.sh .
+
+      - name: 10. Debug APK বিল্ড
+        run: |
+          set -uo pipefail
+          cd android
+          chmod +x gradlew
+          set +e
+          ./gradlew assembleDebug --stacktrace --no-daemon 2>&1 | tee ../gradle-debug.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::error title=Gradle debug build ব্যর্থ::নিচে ত্রুটির সারাংশ। পুরো লগ 'gradle-debug-log' artifact-এ আছে।"
+            echo "------ ত্রুটির সারাংশ ------"
+            grep -nE "error:|FAILURE|What went wrong|Could not|not found|requires|Unsupported|invalid source release" -A4 ../gradle-debug.log | head -120 || true
+            exit "$code"
+          fi
+
+      - name: 11. Debug APK খুঁজে নাম ঠিক করা
+        run: |
+          set -euo pipefail
+          trap 'echo "::error title=APK পাওয়া যায়নি::android/app/build/outputs/apk/debug/-এ কোনো .apk নেই। ধাপ ১০-এর লগ দেখুন।"' ERR
+          APK="$(find android/app/build/outputs/apk/debug -name '*.apk' | head -1)"
+          test -n "$APK"
+          mkdir -p dist
+          cp "$APK" dist/LiftRideTest-debug.apk
+          ls -l dist
+          {
+            echo "### ✅ Debug APK তৈরি হয়েছে"
+            echo ""
+            echo "পাতার নিচে **Artifacts** অংশ থেকে \`LiftRideTest-debug-apk\` নামান, unzip করে \`LiftRideTest-debug.apk\` ফোনে ইনস্টল করুন।"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 12. Debug APK আপলোড
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiftRideTest-debug-apk
+          path: dist/LiftRideTest-debug.apk
+          if-no-files-found: error
+
+      - name: 13. (ঐচ্ছিক) Signed release APK
+        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          trap 'echo "::warning title=Release signing ব্যর্থ::Debug APK ঠিকই আছে। KEYSTORE_* secrets (নাম/মান/alias/password) মিলিয়ে দেখুন।"' ERR
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          BT="$(ls "$SDK/build-tools" | sort -V | tail -1)"
+          echo "ব্যবহৃত build-tools (যা আছে তার সর্বশেষ): $BT"
+          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          (cd android && ./gradlew assembleRelease --stacktrace --no-daemon)
+          UNSIGNED="$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)"
+          test -n "$UNSIGNED"
+          "$SDK/build-tools/$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
+          KS_PASS="$KEYSTORE_PASSWORD" KEY_PASS="${KEY_PASSWORD:-$KEYSTORE_PASSWORD}" \
+            "$SDK/build-tools/$BT/apksigner" sign --ks release.keystore --ks-key-alias "$KEY_ALIAS" \
+              --ks-pass env:KS_PASS --key-pass env:KEY_PASS --out dist/LiftRideTest-release.apk aligned.apk
+          "$SDK/build-tools/$BT/apksigner" verify dist/LiftRideTest-release.apk
+          rm -f release.keystore
+          echo "### ✅ Signed release APK-ও তৈরি হয়েছে (LiftRideTest-release-apk)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 14. (ঐচ্ছিক) Release APK আপলোড
+        if: ${{ env.KEYSTORE_BASE64 != '' && hashFiles('dist/LiftRideTest-release.apk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiftRideTest-release-apk
+          path: dist/LiftRideTest-release.apk
+
+      - name: 15. ব্যর্থ হলে লগ সংরক্ষণ
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-debug-log
+          path: |
+            gradle-debug.log
+            npm-install.log
+          if-no-files-found: ignore
