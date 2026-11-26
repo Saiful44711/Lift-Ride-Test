@@ -27,7 +27,7 @@
   }
 
   var L = {
-    VERSION: '2.1.0', COLS: COLS, USER_COLS: USER_COLS, MAX_SAMPLES: MAX_SAMPLES,
+    VERSION: '2.2.0', COLS: COLS, USER_COLS: USER_COLS, MAX_SAMPLES: MAX_SAMPLES,
 
     cleanUser: function (u) { return String(u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 32); },
     validPassword: function (p) { return typeof p === 'string' && p.length >= 6 && p.length <= 64; },
@@ -67,11 +67,18 @@
       var pt = raw.pt || [], p = raw.p || [];
       if (pt.length !== p.length || pt.length > MAX_SAMPLES) return 'Pressure length mismatch';
       for (i = 0; i < pt.length; i++) if (!isNum(pt[i]) || !isNum(p[i])) return 'Non-numeric pressure';
+      if (raw.snd) { // v2.2 sound levels (optional)
+        var sd = raw.snd;
+        if (!Array.isArray(sd.t) || !Array.isArray(sd.l) || sd.t.length !== sd.l.length || sd.t.length > 8000) return 'Bad sound data';
+        for (i = 0; i < sd.t.length; i++) if (!isNum(sd.t[i]) || !isNum(sd.l[i])) return 'Non-numeric sound level';
+      }
       return null;
     },
     packRaw: function (raw) {
       function rr(a, f) { var o = new Array(a.length); for (var i = 0; i < a.length; i++) o[i] = Math.round(a[i] * f) / f; return o; }
-      return { t: rr(raw.t, 1e4), ax: rr(raw.ax, 1e4), ay: rr(raw.ay, 1e4), az: rr(raw.az, 1e4), pt: rr(raw.pt || [], 1e4), p: rr(raw.p || [], 1e3) };
+      var o = { t: rr(raw.t, 1e4), ax: rr(raw.ax, 1e4), ay: rr(raw.ay, 1e4), az: rr(raw.az, 1e4), pt: rr(raw.pt || [], 1e4), p: rr(raw.p || [], 1e3) };
+      if (raw.snd && raw.snd.t && raw.snd.t.length) o.snd = { t: rr(raw.snd.t, 1e3), l: rr(raw.snd.l, 100), ref: raw.snd.ref === 'spl' ? 'spl' : 'dbfs' };
+      return o;
     },
     toArray: function (a) { var o = new Array(a.length); for (var i = 0; i < a.length; i++) o[i] = a[i]; return o; },
 

@@ -4,27 +4,36 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var Core = window.LiftCore;
-  var APP_VERSION = '2.1.1';
+  var APP_VERSION = '2.2.0';
   var params = new URLSearchParams(location.search);
 
   /* ---------------- settings ---------------- */
   var S = {
     theme: 'system', source: 'auto', demoSpeed: 1, lpDyn: 10, tau: 2, useBaro: true,
     rollerDia: '', sheaveDia: '', operator: '', org: '', instr: '', lastCheck: null,
-    limits: Object.assign({}, Core.DEFAULT_LIMITS),
+    limits: Object.assign({}, Core.DEFAULT_LIMITS),          // v2.1 (kept only for migration)
+    limitSet: 'reference', limitsManual: null,
+    lift: { roping: '1', gear: '', poles: '', rail: '', bracket: '' },
+    recSound: true, soundOffset: 110, soundCal: false,
+    chartMode: 'iso', chartLayout: 'grid', chartLimits: true,
     form: { building: '', lift: '', from: '', to: '', height: '', rated: '', note: '', persons: '1', fan: false, chime: false, placed: false }
   };
   (function load() {
     var saved = Store.loadSettings();
     if (saved) {
-      Object.keys(saved).forEach(function (k) { if (k === 'limits' || k === 'form') Object.assign(S[k], saved[k]); else S[k] = saved[k]; });
+      Object.keys(saved).forEach(function (k) { if (k === 'limits' || k === 'form' || k === 'lift') Object.assign(S[k], saved[k]); else S[k] = saved[k]; });
     }
+    // v2.2: manual limit set starts from the user's v2.1 values
+    if (!S.limitsManual) S.limitsManual = Object.assign({}, Core.DEFAULT_LIMITS, saved && saved.limits ? saved.limits : {});
+    S.limitsManual = Object.assign({}, Core.DEFAULT_LIMITS, S.limitsManual);
     if (!(S.lpDyn >= 1)) S.lpDyn = 10;
     if (params.get('source')) S.source = params.get('source');
     if (params.get('demoSpeed')) S.demoSpeed = Number(params.get('demoSpeed')) || 1;
     if (params.get('theme')) S.theme = params.get('theme');
   })();
   function save() { Store.saveSettings(S); }
+  function effLimits() { return S.limitSet === 'manual' ? Object.assign({}, Core.DEFAULT_LIMITS, S.limitsManual) : Object.assign({}, Core.DEFAULT_LIMITS); }
+  function liftObj() { var L = S.lift; return { roping: L.roping, sheaveMm: S.sheaveDia, gear: L.gear, poles: L.poles, rollerMm: S.rollerDia, railLen: L.rail, bracketM: L.bracket }; }
 
   /* ---------------- helpers ---------------- */
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
@@ -123,7 +132,16 @@
     readForm(); save();
     if (!sensorInfo || !sensorInfo.accel) { setRecUI('idle', sensorInfo && sensorInfo.error ? sensorInfo.error : 'No accelerometer found.'); return; }
     rec = { buf: { t: [], ax: [], ay: [], az: [], pt: [], p: [] }, calibDone: false, u: null, gm: 0, pref: null, avs: 0, hs: 0, ps: null, hb: 0,
-      liveT: [], liveA: [], lastT: 0, prevAvs: 0, prevT: 0, jv: 0, cnt: 0, lastRate: 0, rateAt: performance.now(), ctrl: null, info: sensorInfo, stopping: false };
+      liveT: [], liveA: [], lastT: 0, prevAvs: 0, prevT: 0, jv: 0, cnt: 0, lastRate: 0, rateAt: performance.now(), ctrl: null, info: sensorInfo, stopping: false,
+      snd: { t: [], l: [], ref: 'dbfs' }, sndQ: [], mic: null, zeroPerf: null, sndLast: null, sndNote: '' };
+    $('lvS').textContent = '–';
+    if (S.recSound && sensorInfo.mode !== 'demo') {
+      if (window.Mic && Mic.supported()) {
+        var rr = rec;
+        Mic.start(function (x) { if (rec !== rr || rr.stopping) return; rr.sndQ.push(x); rr.sndLast = x.l + (Number(S.soundOffset) || 0); }).then(function (c) { if (rec === rr && !rr.stopping) rr.mic = c; else c.stop(); })
+          .catch(function (e) { rr.sndNote = 'Sound not recorded: ' + (e && e.message || e); });
+      } else rec.sndNote = 'Sound not recorded: no microphone access on this device.';
+    }
     setRecUI('calib', 'Keep the phone still… (about 3 seconds)');
     ['lvA', 'lvJ', 'lvH', 'lvT', 'lvR'].forEach(function (i) { $(i).textContent = '0'; }); $('lvB').textContent = '–';
     var seed = params.get('seed') ? Number(params.get('seed')) : undefined;
@@ -138,6 +156,9 @@
   function onBatch(b) {
     var r = rec; if (!r || r.stopping) return;
     var B = r.buf, k;
+    if (r.zeroPerf === null && b.t.length) r.zeroPerf = performance.now() - b.t[b.t.length - 1] * 1000;
+    if (b.st && b.st.length) { r.snd.ref = b.sref || 'spl'; for (k = 0; k < b.st.length; k++) { r.snd.t.push(b.st[k]); r.snd.l.push(b.sl[k]); } r.sndLast = b.sl[b.sl.length - 1]; }
+    if (r.sndQ.length && r.zeroPerf !== null) { r.sndQ.forEach(function (x) { var ts = (x.perf - r.zeroPerf) / 1000; if (ts >= 0) { r.snd.t.push(ts); r.snd.l.push(x.l); } }); r.sndQ = []; }
     for (k = 0; k < b.t.length; k++) { B.t.push(b.t[k]); B.ax.push(b.ax[k]); B.ay.push(b.ay[k]); B.az.push(b.az[k]); }
     for (k = 0; k < b.pt.length; k++) { B.pt.push(b.pt[k]); B.p.push(b.p[k]); }
     r.cnt += b.t.length;
@@ -179,6 +200,7 @@
       $('lvJ').textContent = r.jv.toFixed(2);
       if (r.pref) $('lvB').textContent = r.hb.toFixed(1);
     }
+    $('lvS').textContent = r.sndLast === null ? '–' : r.sndLast.toFixed(0);
     drawLive();
   }
 
@@ -197,8 +219,11 @@
   function stopRec(auto) {
     var r = rec; if (!r || r.stopping) return;
     r.stopping = true; clearInterval(uiTimer); setRecUI('busy', 'Analysing…');
-    Promise.resolve(r.ctrl ? r.ctrl.stop() : null).then(function () {
+    Promise.resolve(r.ctrl ? r.ctrl.stop() : null).then(function () { return r.mic ? r.mic.stop() : null; }).then(function () {
       var raw = r.buf, meta = buildMeta(r.info);
+      if (r.sndQ.length && r.zeroPerf !== null) r.sndQ.forEach(function (x) { var ts = (x.perf - r.zeroPerf) / 1000; if (ts >= 0) { r.snd.t.push(ts); r.snd.l.push(x.l); } });
+      if (r.snd.t.length > 4) raw.snd = r.snd;
+      if (r.sndNote) meta.note = [meta.note, r.sndNote].filter(Boolean).join(' · ');
       rec = null;
       var res;
       try { res = Core.analyze(raw, analysisOpts(meta)); }
@@ -218,13 +243,14 @@
     return { building: F.building || (demo ? 'DEMO building' : ''), lift: F.lift || (demo ? 'DEMO lift' : 'Lift'), from: from, to: to,
       floors: [from, to].filter(Boolean).join(' → '), note: (demo ? 'DEMO (fictional data) ' : '') + F.note,
       date: fmtDate(Date.now()), knownHeight: numOrNull(F.height), rated: numOrNull(F.rated), source: info.mode, demo: demo, baroAvailable: !!info.baro,
+      liftData: liftObj(),
       persons: F.persons, fan: !!F.fan, chime: !!F.chime, placed: !!F.placed,
       operator: S.operator, org: S.org, instr: S.instr || info.accelName || (demo ? 'DEMO (simulated sensor)' : 'Phone accelerometer'),
       lastCheck: S.lastCheck ? S.lastCheck.date + (S.lastCheck.ok ? ' (passed)' : ' (warnings)') : 'not done' };
   }
   function analysisOpts(meta) {
-    return { lpDyn: S.lpDyn, tau: S.tau, useBaro: S.useBaro, limits: S.limits, knownHeight: meta.knownHeight, ratedSpeed: meta.rated,
-      rollerDiaMm: numOrNull(S.rollerDia), sheaveDiaMm: numOrNull(S.sheaveDia) };
+    return { lpDyn: S.lpDyn, tau: S.tau, useBaro: S.useBaro, limits: effLimits(), limitSet: S.limitSet, knownHeight: meta.knownHeight, ratedSpeed: meta.rated,
+      rollerDiaMm: numOrNull(S.rollerDia), sheaveDiaMm: numOrNull(S.sheaveDia), soundOffset: Number(S.soundOffset) || 0, soundCalibrated: !!S.soundCal };
   }
   function summarize(res) {
     var m = res.m;
@@ -272,55 +298,110 @@
       ['Z vertical, constant-accel. region', m.zC.max.toFixed(dp), m.zC.a95.toFixed(dp), m.zC.zp.toFixed(dp)],
       ['Z vertical, non-constant region', m.zN.max.toFixed(dp), '–', m.zN.zp.toFixed(dp)]
     ]);
-    // ISO 18738 6.5 c)
-    table('perfTbl', ['Quantity', 'Maximum', 'A95 / V95'], [
-      ['Speed (m/s)', m.vPeak.toFixed(2), m.v95.toFixed(2) + (m.v95ok ? '' : ' *')],
-      ['Acceleration (m/s²)', m.aMax.toFixed(2), m.aA95.toFixed(2)],
-      ['Deceleration (m/s²)', m.dMax.toFixed(2), m.dA95.toFixed(2)],
-      ['Jerk (m/s³)', m.jMax.toFixed(1), '–'],
-      ['Travel height (m)', m.height.toFixed(2), '–'],
-      ['Ride time (s)', m.rideTime.toFixed(1), '–']
+    table('rawTbl', ['', 'X', 'Y', 'Z'], [
+      ['Max Pk to Pk', m.raw.x.max.toFixed(dp), m.raw.y.max.toFixed(dp), m.raw.z.max.toFixed(dp)],
+      ['A95', m.raw.x.a95.toFixed(dp), m.raw.y.a95.toFixed(dp), m.raw.z.a95.toFixed(dp)],
+      ['Max 0 to Pk', m.raw.x.zp.toFixed(dp), m.raw.y.zp.toFixed(dp), m.raw.z.zp.toFixed(dp)]
     ]);
+    // ISO 18738 6.5 c)
+    table('perfTbl', ['Quantity', 'Maximum', 'A95 / V95', 'Average'], [
+      ['Speed (m/s)', m.vPeak.toFixed(2), m.v95.toFixed(2) + (m.v95ok ? '' : ' *'), '–'],
+      ['Acceleration (m/s²)', m.aMax.toFixed(3), m.aA95.toFixed(3), m.aAvg.toFixed(3)],
+      ['Deceleration (m/s²)', m.dMax.toFixed(3), m.dA95.toFixed(3), m.dAvg.toFixed(3)],
+      ['Jerk (m/s³)', m.jMax.toFixed(2), m.jP95.toFixed(2), '–'],
+      ['Travel height (m)', m.height.toFixed(2), '–', '–'],
+      ['Ride time (s)', m.rideTime.toFixed(1), '–', '–']
+    ]);
+    renderSound(res);
     renderVerdicts(res);
-    renderDiag(res);
+    current.src = window.LiftSource ? LiftSource.analyzeRun(res, liftObj(), effLimits()) : null;
+    renderSource(current.src, res);
     $('rHeight').value = meta.knownHeight || '';
-    var host = $('charts'); host.textContent = ''; chartCanvases = [];
-    Report.chartConfigs(res, S.limits).forEach(function (item) {
-      var card = el('div', 'card'); var cv = el('canvas', 'chart'); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', item.title);
-      card.appendChild(cv); host.appendChild(card); chartCanvases.push({ cv: cv, cfg: item.cfg });
-    });
-    drawAllCharts();
+    renderCharts();
     if (current.owner) $('runsBox').hidden = true; else renderCoverage(meta);
+  }
+  function renderSound(res) {
+    var so = res.sound, card = $('soundCard');
+    card.hidden = !so; if (!so) return;
+    var f = function (r, k) { return r && isFinite(r[k]) ? r[k].toFixed(1) : '–'; };
+    table('soundTbl', ['', 'Full run', 'Pre-run', 'Post-run', 'Full record'], [
+      ['Max (LAF, 125 ms)', f(so.run, 'max'), f(so.pre, 'max'), f(so.post, 'max'), f(so.full, 'max')],
+      ['LAeq', f(so.run, 'leq'), f(so.pre, 'leq'), f(so.post, 'leq'), f(so.full, 'leq')]
+    ]);
+    var c = $('soundChip'); c.textContent = so.demo ? 'DEMO' : so.calibrated ? 'Calibrated (offset ' + so.offset.toFixed(1) + ' dB)' : 'Uncalibrated — indicative';
+    c.className = 'chip ' + (so.demo ? 'warn' : so.calibrated ? 'ok' : 'warn');
+    $('soundNote').textContent = 'Full run = from the start to the stop of motion. Pre-run / post-run = before / after (door closing, chimes, door opening). A-weighted 125 ms blocks from the ' + (so.demo ? 'DEMO data' : 'device microphone') + '.';
   }
   function renderVerdicts(res) {
     var tb = $('verdictTbl'); tb.textContent = '';
-    var head = el('tr'); ['Parameter', 'Measured', 'Limit', 'Status'].forEach(function (h) { head.appendChild(el('th', '', h)); }); tb.appendChild(head);
+    var head = el('tr'); ['Parameter', 'Measured', 'Limit', '% Limit', 'Status'].forEach(function (h) { head.appendChild(el('th', '', h)); }); tb.appendChild(head);
     res.verdicts.forEach(function (v) {
       var tr = el('tr'); tr.appendChild(el('td', '', v.label));
       tr.appendChild(el('td', 'num', v.value.toFixed(v.dp) + ' ' + v.unit));
-      tr.appendChild(el('td', 'num', (v.band ? '±5% ' : '≤ ') + v.limit + ' ' + v.unit));
-      var c = el('td'); c.appendChild(chip(v.ok ? '✓ Within limit' : '✗ Exceeds', v.ok ? 'ok' : 'bad')); tr.appendChild(c); tb.appendChild(tr);
+      tr.appendChild(el('td', 'num', v.band ? v.lo + '–' + v.hi + ' % of ' + v.limit + ' ' + v.unit : '≤ ' + v.limit + ' ' + v.unit));
+      tr.appendChild(el('td', 'num', v.db ? (v.margin >= 0 ? '+' : '') + v.margin.toFixed(1) + ' dB' : v.pct === null || v.pct === undefined ? '–' : v.pct.toFixed(1) + ' %'));
+      var c = el('td'); c.appendChild(chip(v.ok ? '✓ PASS' : '✗ FAIL', v.ok ? 'ok' : 'bad')); tr.appendChild(c); tb.appendChild(tr);
+    });
+    var lc = $('limChip'); lc.textContent = S.limitSet === 'manual' ? 'Manual limits' : 'Reference limits'; lc.className = 'chip ' + (S.limitSet === 'manual' ? 'warn' : 'ok');
+    $('limNote').textContent = S.limitSet === 'manual' ? 'Your own limits (More → Limits). ISO 18738 defines the method, not pass / fail values.' :
+      'Reference set: speed 92–105 % of rated and acceleration 1.5 m/s² as in GB/T 10058, the other values are common screening values. ISO 18738 defines the method, not pass / fail values. Switch to Manual in More → Limits.';
+  }
+  var LEVEL_CHIP = { high: ['High', 'bad'], medium: ['Medium', 'warn'], low: ['Low', ''], ok: ['OK', 'ok'] };
+  function renderFindings(box, F) {
+    box.textContent = '';
+    F.forEach(function (f) {
+      var d = el('div', 'finding lv-' + f.level), h = el('div', 'row between wrap');
+      h.appendChild(el('b', '', f.title)); var lc = LEVEL_CHIP[f.level] || ['', '']; h.appendChild(chip(lc[0], lc[1])); d.appendChild(h);
+      var ul = el('ul', 'small'); f.evidence.forEach(function (e) { ul.appendChild(el('li', '', e)); }); d.appendChild(ul);
+      if (f.check.length) d.appendChild(el('p', 'small check-list', 'Check: ' + f.check.join(' · ')));
+      box.appendChild(d);
     });
   }
-  function renderDiag(res) {
-    var box = $('diagBox'); box.textContent = '';
-    var P = res.spectrum.peaks, d = res.diag;
-    function peaks(arr) { return arr.length ? arr.map(function (p) { return p.f.toFixed(1) + ' Hz (' + p.mg.toFixed(1) + ' mg)'; }).join(', ') : 'none'; }
-    if (res.spectrum.nb) {
-      box.appendChild(el('p', '', 'Strongest vertical vibration lines at steady speed: ' + peaks(P.z) + '.'));
-      box.appendChild(el('p', '', 'Horizontal X: ' + peaks(P.x) + '. Y: ' + peaks(P.y) + '.'));
-    } else box.appendChild(el('p', 'muted', 'The steady-speed section was too short for an FFT spectrum.'));
-    if (d.rollerHz) box.appendChild(el('p', '', 'Roller guide rotation ≈ ' + d.rollerHz.toFixed(2) + ' Hz at ' + d.vSteady.toFixed(2) + ' m/s.'));
-    if (d.sheaveHz) box.appendChild(el('p', '', 'Traction sheave rotation ≈ ' + d.sheaveHz.toFixed(2) + ' Hz.'));
-    d.matches.forEach(function (mt) { box.appendChild(el('p', '', 'Possible match: ' + mt.part + (mt.harmonic > 1 ? ' ×' + mt.harmonic : '') + ' (' + mt.f.toFixed(1) + ' Hz) ↔ ' + mt.peak.axis + ' peak at ' + mt.peak.f.toFixed(1) + ' Hz, ' + mt.peak.mg.toFixed(1) + ' mg. Check the part.')); });
-    if ((d.rollerHz || d.sheaveHz) && !d.matches.length) box.appendChild(el('p', 'muted', 'No strong spectrum line near the entered rotation frequencies.'));
-    var rows = res.bumps.map(function (b, i) { return [String(i + 1), b.t.toFixed(1) + ' s', b.pos.toFixed(1) + ' m', b.mg.toFixed(mgDp(res))]; });
-    table('bumpTbl', ['Largest vibration events', 'Time', 'Position*', 'p-p (mg)'], rows);
-    $('bumpTbl').parentNode.hidden = !rows.length;
-    if (rows.length) box.appendChild(el('p', 'muted small', '*Position = distance from the start floor along the travel, from the integrated height. Use it to find rail joints or guide problems; accuracy is about ±0.5 m.'));
+  function renderSource(src, res) {
+    var card = $('srcCard'); card.hidden = !src; if (!src) return;
+    renderFindings($('srcFind'), src.findings);
+    var dp = mgDp(res);
+    table('evTbl', ['Axis', 'Time', 'Height*', 'Speed', 'Phase', '≈ f', 'p-p (mg)'], src.events.slice(0, 10).map(function (e) {
+      return [e.axis.toUpperCase(), e.t.toFixed(1) + ' s', e.posAbs.toFixed(1) + ' m', e.v.toFixed(2) + ' m/s', e.phase, e.f.toFixed(0) + ' Hz', e.mg.toFixed(dp) + (e.overLimit ? ' ✗' : '')];
+    }));
+    $('evTbl').parentNode.hidden = !src.events.length;
+    table('pkTbl', ['Axis', 'Frequency', 'Amplitude', 'Rolling Ø at car speed', 'Possible part'], src.peaks.slice(0, 9).map(function (p) {
+      return [p.axis.toUpperCase(), p.f.toFixed(2) + ' Hz', p.mg.toFixed(1) + ' mg', p.dEqMm ? Math.round(p.dEqMm) + ' mm' : '–', p.matches.length ? p.matches.map(function (c) { return c.part + (c.harmonic > 1 ? ' ×' + c.harmonic : ''); }).join(', ') : '–'];
+    }));
+    $('pkTbl').parentNode.hidden = !src.peaks.length;
+    var nb = $('srcNotes'); nb.textContent = '';
+    nb.appendChild(el('p', '', '*Height above the lowest point of this run (from the integrated travel, about ±0.5 m). Events are the largest ISO-weighted peak-to-peak cycles between boundaries 1 and 2.'));
+    src.notes.forEach(function (n) { nb.appendChild(el('p', '', n)); });
   }
+  /* ---- interactive charts ---- */
+  var chartUI = null, chartState = { view: {}, cursor: {}, yScale: {} }, chartFor = null;
+  function renderCharts() {
+    if (!current) return;
+    if (chartFor !== current.res) { if (!chartFor || !current.res || chartFor.t.length !== current.res.t.length) chartState = { view: {}, cursor: {}, yScale: chartState.yScale }; chartFor = current.res; }
+    var host = $('charts');
+    host.classList.toggle('stacked', S.chartLayout === 'stack');
+    var items = Report.chartConfigs(current.res, effLimits(), { mode: S.chartMode, lift: liftObj(), limits: S.chartLimits });
+    if (S.chartLayout === 'stack') {
+      var order = ['sound', 'vibx', 'viby', 'vibz', 'speed', 'height', 'accel', 'jerk'];
+      items.sort(function (a, b) { var ia = order.indexOf(a.id), ib = order.indexOf(b.id); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    }
+    chartUI = ChartUI.mount(host, items, { res: current.res, state: chartState });
+    chartUI.redraw();
+    $('cmIso').classList.toggle('active', S.chartMode !== 'raw'); $('cmRaw').classList.toggle('active', S.chartMode === 'raw');
+    $('clGrid').classList.toggle('active', S.chartLayout !== 'stack'); $('clStack').classList.toggle('active', S.chartLayout === 'stack');
+    $('cLimits').checked = S.chartLimits !== false;
+  }
+  $('cmIso').addEventListener('click', function () { S.chartMode = 'iso'; save(); renderCharts(); });
+  $('cmRaw').addEventListener('click', function () { S.chartMode = 'raw'; save(); renderCharts(); });
+  $('clGrid').addEventListener('click', function () { S.chartLayout = 'grid'; save(); renderCharts(); });
+  $('clStack').addEventListener('click', function () { S.chartLayout = 'stack'; save(); renderCharts(); });
+  $('cLimits').addEventListener('change', function () { S.chartLimits = this.checked; save(); renderCharts(); });
+  $('cReset').addEventListener('click', function () { if (chartUI) chartUI.reset(); });
+  $('btnLimitsGo').addEventListener('click', function () { showTab('more'); setTimeout(function () { $('limitsCard').scrollIntoView({ block: 'start' }); }, 50); });
+  $('srcLiftLink').addEventListener('click', function (e) { e.preventDefault(); showTab('measure'); $('liftData').open = true; setTimeout(function () { $('liftData').scrollIntoView({ block: 'start' }); }, 50); });
   function drawAllCharts() {
-    chartCanvases.forEach(function (c) { if (c.cv.clientWidth) Charts.draw(c.cv, Object.assign({ font: 12 }, c.cfg)); });
+    if (chartUI) chartUI.redraw();
+    if (cmpLast) drawCompare(cmpLast);
     drawLive();
   }
   window.addEventListener('resize', function () { clearTimeout(window.__rz); window.__rz = setTimeout(drawAllCharts, 120); });
@@ -380,7 +461,7 @@
       if (current.owner) return Backend.list({ q: current.meta.building || '' }).then(function (o) { return o.rows.map(function (r) { return { meta: { building: r.building, lift: r.lift, demo: r.demo === 'yes' }, summary: { dir: r.dir } }; }); });
       return Store.list();
     }).then(function (items) {
-      var pages = Report.render(current.res, current.meta, S.limits, coverageCount(items, current.meta));
+      var pages = Report.render(current.res, current.meta, effLimits(), coverageCount(items, current.meta), { limitSet: S.limitSet, lift: liftObj(), source: current.src });
       var bytes = PDFLib.fromCanvases(pages, { title: 'Lift Ride Quality Report ' + current.meta.lift });
       return saveFile(baseName() + '.pdf', 'application/pdf', bytes);
     }).then(function (m) { $('exportMsg').textContent = m; }).catch(function (e) { $('exportMsg').textContent = '⚠ ' + (e && e.message || e); });
@@ -392,8 +473,12 @@
     updateSyncLine();
     Store.list().then(function (items) {
       var ul = $('histList'); ul.textContent = ''; $('histEmpty').hidden = items.length > 0;
+      cmpSel = cmpSel.filter(function (id) { return items.some(function (it) { return it.id === id; }); }); updCmpBtn();
       items.forEach(function (it) {
         var li = el('li'), info = el('div', 'info'), s = it.summary || {};
+        var cb = el('input'); cb.type = 'checkbox'; cb.className = 'cmp-cb'; cb.setAttribute('aria-label', 'Select for compare'); cb.checked = cmpSel.indexOf(it.id) >= 0;
+        cb.addEventListener('change', function () { if (cb.checked) { if (cmpSel.indexOf(it.id) < 0) cmpSel.push(it.id); } else cmpSel = cmpSel.filter(function (x) { return x !== it.id; }); updCmpBtn(); });
+        li.appendChild(cb);
         var title = el('b', '', [it.meta.building, it.meta.lift || 'Lift'].filter(Boolean).join(' · ') + ' — ' + it.meta.date); info.appendChild(title);
         info.appendChild(el('span', 'muted small', (s.dir === 'up' ? '↑ ' : '↓ ') + 'H ' + (s.height || 0).toFixed(1) + ' m · v ' + (s.vPeak || 0).toFixed(2) + ' m/s · a ' + (s.aMax || 0).toFixed(2) + ' · jerk ' + (s.jMax || 0).toFixed(1) + (it.meta.demo ? ' · DEMO' : '')));
         info.addEventListener('click', function () { openRecord(it.id); });
@@ -405,6 +490,36 @@
         li.appendChild(del); ul.appendChild(li);
       });
     });
+  }
+  var cmpSel = [], cmpLast = null;
+  function updCmpBtn() { var b = $('btnCompare'); b.textContent = 'Compare selected (' + cmpSel.length + ')'; b.disabled = cmpSel.length < 2; }
+  $('btnCompare').addEventListener('click', function () {
+    $('cmpCard').hidden = false; $('cmpFind').textContent = 'Analysing…';
+    Promise.all(cmpSel.map(function (id) { return Store.get(id); })).then(function (recs) {
+      var items = [];
+      recs.forEach(function (r) { if (!r) return; try { items.push({ meta: r.meta, res: Core.analyze(r.raw, analysisOpts(r.meta)) }); } catch (e) { /* skip */ } });
+      if (items.length < 2) { $('cmpFind').textContent = 'At least two records could be analysed.'; return; }
+      var keys = {}; items.forEach(function (it) { keys[(it.meta.building || '') + '|' + (it.meta.lift || '')] = 1; });
+      var C = LiftSource.compare(items, liftObj(), effLimits());
+      if (Object.keys(keys).length > 1) C.warnings.unshift('The selected records are from different lifts (building / lift ID). Compare runs of one lift only.');
+      cmpLast = C; renderCompare(C); $('cmpCard').scrollIntoView({ block: 'start' });
+    });
+  });
+  $('cmpClose').addEventListener('click', function () { $('cmpCard').hidden = true; cmpLast = null; });
+  function renderCompare(C) {
+    var w = $('cmpWarn'); w.textContent = ''; C.warnings.forEach(function (t) { w.appendChild(el('div', 'alert', '⚠ ' + t)); });
+    renderFindings($('cmpFind'), C.findings.length ? C.findings : [{ title: 'No pattern common to these runs', level: 'low', evidence: ['No event height repeats and no frequency follows the speed.'], check: [] }]);
+    table('cmpRuns', ['Run', 'Speed', 'Height', 'A95 Z', 'A95 X', 'A95 Y'], C.runs.map(function (r) { return [r.label, r.v.toFixed(2) + ' m/s', r.height.toFixed(1) + ' m', r.a95.z.toFixed(1), r.a95.x.toFixed(1), r.a95.y.toFixed(1)]; }));
+    table('cmpRec', ['Height (from bottom)', 'Runs', 'Directions', 'Axis', 'Max p-p (mg)'], C.recurring.slice(0, 10).map(function (c) { return [c.posAbs.toFixed(1) + ' m', String(c.runs), c.dirs.join(' + '), c.axes.join('/').toUpperCase(), c.maxMg.toFixed(1)]; }));
+    $('cmpRec').parentNode.hidden = !C.recurring.length;
+    drawCompare(C);
+  }
+  function drawCompare(C) {
+    var cv = $('cmpChart'); if (!cv.clientWidth) return;
+    var cols = ['#0b63c4', '#d9480f', '#2b8a3e', '#7048e8', '#ad1457', '#00838f'];
+    Charts.draw(cv, { title: 'Vibration events against height (each dot = one event)', xlabel: 'Height above the lowest point (m)', ylabel: 'p-p (mg)', font: 12, ymin: 0,
+      series: C.runs.map(function (r, k) { var ev = r.events.slice().sort(function (a, b) { return a.posAbs - b.posAbs; }); return { x: ev.map(function (e) { return e.posAbs; }), y: ev.map(function (e) { return e.mg; }), label: r.label, marker: true, line: false, color: cols[k % cols.length] }; }),
+      vlines: C.recurring.slice(0, 6).map(function (c) { return { x: c.posAbs, label: c.posAbs.toFixed(1) + ' m', color: '#c4302b' }; }) });
   }
   function openRecord(id) {
     Store.get(id).then(function (r) {
@@ -421,12 +536,22 @@
   });
 
   /* ---------------- settings form ---------------- */
-  var limitMap = { lAccel: 'accel', lDecel: 'decel', lJerk: 'jerk', lA95v: 'a95v', lA95h: 'a95h', lComfort: 'comfort' };
+  var limitMap = { lAccel: 'accel', lDecel: 'decel', lJerk: 'jerk', lA95v: 'a95v', lA95h: 'a95h', lMaxv: 'maxv', lMaxh: 'maxh', lComfort: 'comfort',
+    lSound: 'sound', lSoundHi: 'soundHi', lSpeedLo: 'speedLo', lSpeedHi: 'speedHi' };
+  function fillLimits() {
+    var man = S.limitSet === 'manual', L = effLimits();
+    Object.keys(limitMap).forEach(function (id) { $(id).value = L[limitMap[id]]; $(id).disabled = !man; });
+    $('lsRef').classList.toggle('active', !man); $('lsMan').classList.toggle('active', man);
+    $('btnLimitsReset').hidden = !man;
+    $('limMsg').textContent = man ? 'Manual set in use. Results, charts and the PDF use these values.' : 'Reference set in use (read-only). Tap Manual to enter your own values.';
+  }
   function fillSettings() {
     $('sTheme').value = S.theme; $('sSource').value = S.source; $('sDemoSpeed').value = String(S.demoSpeed);
-    Object.keys(limitMap).forEach(function (id) { $(id).value = S.limits[limitMap[id]]; });
+    fillLimits();
     $('aLp').value = S.lpDyn; $('aTau').value = S.tau; $('aBaro').checked = !!S.useBaro; $('aRoller').value = S.rollerDia; $('aSheave').value = S.sheaveDia;
+    $('dRoping').value = String(S.lift.roping || '1'); $('dGear').value = S.lift.gear; $('dPoles').value = S.lift.poles; $('dRail').value = S.lift.rail; $('dBracket').value = S.lift.bracket;
     $('sOperator').value = S.operator; $('sOrg').value = S.org; $('sInstr').value = S.instr;
+    $('fSound').checked = S.recSound !== false; $('sOffset').value = Number(S.soundOffset).toFixed(1); renderCal();
     renderCheck(S.lastCheck);
   }
   $('sTheme').addEventListener('change', function () { S.theme = this.value; save(); applyTheme(); });
@@ -434,11 +559,40 @@
   $('sDemoSpeed').addEventListener('change', function () { S.demoSpeed = Number(this.value) || 1; save(); });
   Object.keys(limitMap).forEach(function (id) {
     $(id).addEventListener('change', function () {
-      var v = parseFloat(this.value); if (!isFinite(v) || v <= 0) { this.value = S.limits[limitMap[id]]; return; }
-      S.limits[limitMap[id]] = v; save(); reanalyze(false);
+      if (S.limitSet !== 'manual') return;
+      var v = parseFloat(this.value); if (!isFinite(v) || v <= 0) { this.value = S.limitsManual[limitMap[id]]; return; }
+      S.limitsManual[limitMap[id]] = v; save(); reanalyze(false);
     });
   });
-  $('btnLimitsReset').addEventListener('click', function () { S.limits = Object.assign({}, Core.DEFAULT_LIMITS); save(); fillSettings(); reanalyze(false); });
+  $('lsRef').addEventListener('click', function () { S.limitSet = 'reference'; save(); fillLimits(); reanalyze(false); });
+  $('lsMan').addEventListener('click', function () { S.limitSet = 'manual'; save(); fillLimits(); reanalyze(false); });
+  $('btnLimitsReset').addEventListener('click', function () { S.limitsManual = Object.assign({}, Core.DEFAULT_LIMITS); save(); fillLimits(); reanalyze(false); });
+  [['dRoping', 'roping'], ['dGear', 'gear'], ['dPoles', 'poles'], ['dRail', 'rail'], ['dBracket', 'bracket']].forEach(function (p) {
+    $(p[0]).addEventListener('change', function () { S.lift[p[1]] = this.value; save(); reanalyze(false); });
+  });
+  /* ---- sound settings ---- */
+  function renderCal() { var c = $('calChip'); c.textContent = S.soundCal ? 'Calibrated' : 'Not calibrated'; c.className = 'chip ' + (S.soundCal ? 'ok' : 'warn'); }
+  $('fSound').addEventListener('change', function () { S.recSound = this.checked; save(); });
+  $('sOffset').addEventListener('change', function () { var v = parseFloat(this.value); if (!isFinite(v)) { this.value = S.soundOffset; return; } S.soundOffset = v; save(); reanalyze(false); });
+  $('btnCal').addEventListener('click', function () {
+    var meter = parseFloat($('sMeter').value);
+    if (!isFinite(meter) || meter < 20 || meter > 130) { $('calMsg').textContent = 'Type the sound level meter reading (dB(A)) first.'; return; }
+    if (!window.Mic || !Mic.supported()) { $('calMsg').textContent = 'No microphone access on this device.'; return; }
+    $('calMsg').textContent = 'Measuring for 5 seconds… keep the noise steady.'; $('btnCal').disabled = true;
+    Mic.measure(5).then(function (lv) {
+      $('btnCal').disabled = false;
+      if (lv === null) { $('calMsg').textContent = 'No sound data arrived.'; return; }
+      S.soundOffset = Math.round((meter - lv) * 10) / 10; S.soundCal = true; save();
+      $('sOffset').value = S.soundOffset.toFixed(1); renderCal(); reanalyze(false);
+      $('calMsg').textContent = 'Calibrated: offset ' + S.soundOffset.toFixed(1) + ' dB. New and old records now use it.';
+    }).catch(function (e) { $('btnCal').disabled = false; $('calMsg').textContent = 'Microphone error: ' + (e && e.message || e); });
+  });
+  $('btnSndTest').addEventListener('click', function () {
+    if (!window.Mic || !Mic.supported()) { $('calMsg').textContent = 'No microphone access on this device.'; return; }
+    $('calMsg').textContent = 'Listening for 3 seconds…';
+    Mic.measure(3).then(function (lv) { $('calMsg').textContent = lv === null ? 'No sound data arrived.' : 'Microphone works: about ' + (lv + Number(S.soundOffset)).toFixed(1) + ' dB(A)' + (S.soundCal ? '' : ' (uncalibrated)') + '.'; })
+      .catch(function (e) { $('calMsg').textContent = 'Microphone error: ' + (e && e.message || e); });
+  });
   $('aLp').addEventListener('change', function () { var v = parseFloat(this.value); if (!(v >= 1 && v <= 20)) { this.value = S.lpDyn; return; } S.lpDyn = v; save(); reanalyze(false); });
   $('aTau').addEventListener('change', function () { var v = parseFloat(this.value); if (!(v >= 0.5 && v <= 10)) { this.value = S.tau; return; } S.tau = v; save(); reanalyze(false); });
   $('aBaro').addEventListener('change', function () { S.useBaro = this.checked; save(); reanalyze(false); });
@@ -658,6 +812,7 @@
     $('adMsg').textContent = 'Downloading…';
     Backend.get(r.id).then(function (o) {
       var raw = { t: Float64Array.from(o.raw.t), ax: Float32Array.from(o.raw.ax), ay: Float32Array.from(o.raw.ay), az: Float32Array.from(o.raw.az), pt: Float64Array.from(o.raw.pt || []), p: Float64Array.from(o.raw.p || []) };
+      if (o.raw.snd) raw.snd = o.raw.snd;
       current = { id: undefined, cloudId: o.id, owner: o.owner, meta: o.meta, raw: raw, res: null };
       current.res = Core.analyze(raw, analysisOpts(o.meta));
       $('adMsg').textContent = ''; renderResults(); showTab('results');
@@ -755,7 +910,7 @@
   });
   $('btnRaw').addEventListener('click', function () {
     if (!current) return;
-    var r = current.raw, pk = CloudLogic.packRaw({ t: r.t, ax: r.ax, ay: r.ay, az: r.az, pt: r.pt || [], p: r.p || [] });
+    var r = current.raw, pk = CloudLogic.packRaw({ t: r.t, ax: r.ax, ay: r.ay, az: r.az, pt: r.pt || [], p: r.p || [], snd: r.snd });
     var doc = { format: 'lift-ride-meter-reading', version: APP_VERSION, exported: new Date().toISOString(), meta: current.meta, raw: pk };
     saveFile(baseName() + '.lrm.json', 'application/json', JSON.stringify(doc)).then(function (m) { $('exportMsg').textContent = m; }).catch(function (e) { $('exportMsg').textContent = '⚠ ' + e.message; });
   });
@@ -771,6 +926,7 @@
         var why = CloudLogic.validateUpload({ clientId: 'import-file', meta: d.meta, summary: {}, raw: d.raw });
         if (why) throw new Error(why);
         var raw = { t: Float64Array.from(d.raw.t), ax: Float32Array.from(d.raw.ax), ay: Float32Array.from(d.raw.ay), az: Float32Array.from(d.raw.az), pt: Float64Array.from(d.raw.pt || []), p: Float64Array.from(d.raw.p || []) };
+        if (d.raw.snd) raw.snd = d.raw.snd;
         var meta = Object.assign({}, d.meta, { imported: f.name });
         var res = Core.analyze(raw, analysisOpts(meta));
         Store.add(meta, raw, summarize(res)).then(function (id) {
@@ -786,8 +942,9 @@
   });
 
   /* ---------------- start-up ---------------- */
-  $('ver').textContent = 'v' + APP_VERSION;
+  $('ver').textContent = 'v' + APP_VERSION + (window.LRM_BUILD && LRM_BUILD.build ? ' · build ' + LRM_BUILD.build : '');
+  if (window.Updater) Updater.init($);
   fillForm(); fillSettings(); applyTheme(); setRecUI('idle', ''); cloudUI(); syncFlush();
   refreshSensors().then(function () { setTimeout(drawLive, 50); });
-  window.__LRM = { get current() { return current; }, S: S, showTab: showTab, refreshSensors: refreshSensors, syncFlush: syncFlush, cloudUI: cloudUI };
+  window.__LRM = { get current() { return current; }, get chartState() { return chartState; }, get compare() { return cmpLast; }, S: S, showTab: showTab, refreshSensors: refreshSensors, syncFlush: syncFlush, cloudUI: cloudUI };
 })();

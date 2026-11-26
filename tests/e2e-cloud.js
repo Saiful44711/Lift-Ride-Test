@@ -26,6 +26,7 @@ function memStore() {
   const browser = await chromium.launch(); const errors = [];
   async function newPage(vw, vh, scheme, q, setup) {
     const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, colorScheme: scheme, acceptDownloads: true, deviceScaleFactor: 2 });
+    await ctx.route('**/config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.LRM_CONFIG={cloudUrl:""};' }));
     if (setup) await setup(ctx);
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));

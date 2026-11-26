@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lift Ride Test start screen: brand blue with the app logo (replaces the default Capacitor splash image) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><color android:color="#0B4A7D"/></item>
+    <item android:gravity="center" android:width="216dp" android:height="216dp" android:drawable="@mipmap/ic_launcher_foreground"/>
+</layer-list>

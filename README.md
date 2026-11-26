@@ -1,8 +1,19 @@
-# লিফট রাইড টেস্ট (Lift Ride Test) — v2.1.1
+# লিফট রাইড টেস্ট (Lift Ride Test) — v2.2.0
 
-ফোনের sensor দিয়ে লিফটের **speed, travel height, vibration ও jerk** মাপার অ্যান্ড্রয়েড অ্যাপ। এই সংস্করণ **ISO 18738:2003** পদ্ধতি অনুযায়ী, অ্যাপের ভাষা **ইংরেজি**, এবং **শুধু accelerometer দিয়েই** পুরো মাপ চলে (barometer ঐচ্ছিক)।
+ফোনের sensor ও মাইক্রোফোন দিয়ে লিফটের **speed, travel height, vibration, jerk ও sound level** মাপা ও বিশ্লেষণের অ্যাপ (Android APK + PC সংস্করণ)। লক্ষ্য: দৈনন্দিন screening ও troubleshooting-এ PMT EVA-র বিকল্প। এই সংস্করণ **ISO 18738:2003** পদ্ধতি অনুযায়ী, অ্যাপের ভাষা **ইংরেজি**, এবং **শুধু accelerometer দিয়েই** পুরো মাপ চলে (barometer ঐচ্ছিক)।
 
 *Design & Developed by Md. Saiful Islam*
+
+**v2.2.0-এ নতুন (বিস্তারিত অংশ ক২-তে):**
+
+- **Update available:** নতুন সংস্করণ এলে ফোনে ও PC-তে নিজে জানায়। PC-তে এক ক্লিকে, ফোনে Update → Install।
+- **জুম ও ক্লিক করা যায় এমন চার্ট:** Ctrl + চাকা, দুই আঙুল বা টেনে জুম। ক্লিক করলে সময়, মান, **লিফটের অবস্থান (m)**, গতি ও ধাপ দেখায়। সব চার্ট একসঙ্গে জুম হয়। হাতে Y-scale বসানো যায়।
+- **প্রতিটি চার্টে সীমা-রেখা**, PMT-র মতো **ISO-weighted / Unfiltered** বদল, আর **Grid / Stacked** বিন্যাস।
+- **শব্দ dB(A):** Full run, Pre-run, Post-run ও Full record-এর Max ও LAeq। sound level meter দিয়ে ক্যালিব্রেশন।
+- **সীমা: Reference (default) / Manual**, সঙ্গে Measured, Limit, % Limit ও PASS/FAIL।
+- **Vibration source finder:** একটি রানে ও কয়েকটি রান মিলিয়ে (Compare) কম্পনের সম্ভাব্য উৎস, প্রমাণ ও কী পরীক্ষা করবেন।
+- **PMT-ধাঁচের PDF:** Sound, Raw data, ISO, Performance, Analysis টেবিল ও stacked curve পাতা।
+- **APK-র আইকন** এখন PC-র মতো নীল লিফট আইকন।
 
 **v2.1.1-এ নতুন:**
 
@@ -44,7 +55,7 @@
 | রুটে | `backend/` ফোল্ডার, `.github/workflows/pages.yml` |
 
 1. `LiftRideTest-repo.zip` PC-তে extract করুন।
-2. GitHub-এ repo-র **মূল পাতায়** যান (`www`-এর ভেতরে নয়)। **Add file → Upload files** চাপুন।
+2. GitHub-এ repo-র **মূল পাতায়** যান। ঠিকানার ঘরে শুধু `github.com/Saiful44711/Lift-Ride-Test` থাকবে, এর পরে `/tree/...` থাকবে না। **Add file → Upload files** চাপুন।
 3. extract করা ফোল্ডারের **ভেতরের সবকিছু** (`www`, `backend`, `native`, `scripts`, `tests`, `docs`, `README.md`, `package.json`, `capacitor.config.json`) একসঙ্গে select করে টেনে ছাড়ুন। ফোল্ডারের গঠন ঠিক থাকে, আর একই নামের পুরোনো ফাইল বদলে যায়।
 4. নিচে **Commit changes** চাপুন।
 5. লুকানো `.github` ফোল্ডার আপলোডে বাদ পড়ে, তাই এগুলো হাতে করুন:
@@ -54,6 +65,69 @@
 6. যাচাই: `www` ফোল্ডারে `config.js`, `manifest.webmanifest`, `sw.js` ও `icons` দেখা গেলে ঠিক আছে।
 
 > ফোনে নতুন APK আগের অ্যাপের ওপরেই বসবে (App ID একই), তাই পুরোনো রেকর্ড মুছবে না।
+
+---
+
+## ক২. v2.2.0 — আপডেট প্রয়োগ (ধাপে ধাপে)
+
+এই অংশ একবার করলে পরের সব আপডেট নিজে নিজে ফোন ও PC-তে পৌঁছাবে।
+
+**১. GitHub-এ নতুন ফাইল তোলা**
+
+1. `LiftRideTest-repo.zip` PC-তে extract করুন।
+2. `github.com/Saiful44711/Lift-Ride-Test` খুলুন। ঠিকানায় এর পরে `/tree/...` থাকবে না।
+3. **Add file → Upload files** চাপুন। extract করা ফোল্ডারের ভেতরের সবকিছু (`www`, `native`, `scripts`, `tests`, `backend`, `docs`, `README.md`, `package.json`, `capacitor.config.json`) টেনে ছাড়ুন, তারপর **Commit changes**।
+4. লুকানো ফাইল দুটো হাতে বদলান: `.github/workflows/build-apk.yml` ও `.github/workflows/pages.yml`। প্রতিটি খুলে ✏ চাপুন, **Ctrl+A** ও **Delete** দিয়ে মুছে প্যাকেজের আলাদা ফাইলের লেখা পেস্ট করুন, তারপর **Commit changes**।
+5. যাচাই: `native/res` ফোল্ডার, `www/build-info.js`, `www/js/source.js`, `www/js/chartui.js` থাকতে হবে। `www/config.js`-এ আপনার Apps Script URL আগে থেকেই বসানো আছে।
+
+**২. স্থায়ী signing key (ফোনে আপডেটের জন্য, একবারই)**
+
+এতদিন প্রতিটি APK আলাদা চাবিতে sign হতো, তাই নতুন APK পুরোনোটার ওপর বসত না। এখন একটা স্থায়ী চাবি থাকবে।
+
+1. প্যাকেজের `LiftRideTest-signing-key-SECRETS.txt` খুলুন। এতে ৪টি নাম ও মান আছে।
+2. repo-তে **Settings → Secrets and variables → Actions → New repository secret** চাপুন।
+3. নামগুলো হুবহু দিন: `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`। প্রতিটির মান ফাইল থেকে কপি করে পেস্ট করে **Add secret** চাপুন। `KEYSTORE_BASE64` একটা লম্বা লাইন, পুরোটা কপি করবেন।
+4. **Settings → Actions → General → Workflow permissions**-এ **Read and write permissions** বেছে **Save** করুন।
+5. `.p12` ফাইল ও SECRETS ফাইলটি নিরাপদ জায়গায় রাখুন (যেমন নিজের Google Drive)। **repo-তে আপলোড করবেন না।** চাবি হারালে ফোনে আবার একবার uninstall করতে হবে।
+
+**৩. নতুন APK বানানো ও ফোনে বসানো (এবারই শেষবার হাতে)**
+
+1. **Actions → Build APK → Run workflow → Run workflow** চাপুন।
+2. সবুজ হলে সারাংশে **"GitHub Release প্রকাশিত"** লেখা থাকবে।
+3. ফোনের Chrome-এ খুলুন: `github.com/Saiful44711/Lift-Ride-Test/releases/latest` → **LiftRideTest.apk** নামান।
+4. **এবার একবার** পুরোনো অ্যাপ uninstall করুন (চাবি বদলেছে বলে)। দরকারি রেকর্ড থাকলে আগে PDF বা Reading file নামিয়ে রাখুন। তারপর নতুন APK ইনস্টল করুন।
+5. এরপর থেকে আর uninstall লাগবে না। নতুন build প্রকাশ হলে অ্যাপ নিজে **"Update available"** দেখাবে: **Update now** চাপুন, ফাইল নামলে খুলুন ও **Install** চাপুন। রেকর্ড থেকে যাবে।
+
+**৪. PC সংস্করণ**
+
+`pages.yml` commit হলেই নতুন PC সংস্করণ প্রকাশ হয়। PC অ্যাপ খোলা থাকলে ওপরে **"A new version is available" → Update now** আসবে, এক ক্লিকে নতুন হবে। প্রথমবার না এলে **Ctrl+Shift+R** চাপুন।
+
+**৫. ক্লাউড backend (ঐচ্ছিক, শব্দের ডেটা ক্লাউডে রাখতে)**
+
+নতুন `Code.gs`-এ পাঠানো রেকর্ডের সঙ্গে শব্দের ডেটাও সংরক্ষিত হয়। পুরোনোটাও চলবে, শুধু ক্লাউড রেকর্ডে শব্দ থাকবে না।
+1. Apps Script খুলে `Code.gs`-এর সব লেখা নতুন `Code.gs` দিয়ে বদলান। ওপরের `ADMIN_USER` ইত্যাদি আগের মতো রাখুন, `ADMIN_PASS` থাকবে `'CHANGE-ME-123'`। **setup আবার চালাবেন না।**
+2. **Deploy → Manage deployments → ✏ → Version: New version → Deploy** চাপুন। URL একই থাকবে।
+3. যাচাই: `/exec` URL খুললে `"version":"2.2.0"` দেখাবে।
+
+### ব্যবহার: নতুন সুবিধাগুলো
+
+| কোথায় | কী করবেন |
+|---|---|
+| Measure → **Lift data** | Roping (1:1/2:1), sheave ব্যাস, gear ratio (gearless = 1), মোটর pole, roller ব্যাস, রেল দৈর্ঘ্য (সাধারণত 5 m), ব্র্যাকেট দূরত্ব দিন। একবার দিলে মনে থাকে, রেকর্ডের সঙ্গেও জমা হয় |
+| Measure → **Record sound level** | ডিফল্ট চালু। প্রথমবার Android মাইক্রোফোনের অনুমতি চাইবে, **Allow** দিন |
+| More → **Sound level** | পাশে একটা sound level meter রেখে স্থির শব্দে (যেমন ফ্যান) meter-এর মান লিখে **Calibrate** চাপুন। একবার করলেই হবে, পুরোনো রেকর্ডও নতুন offset নেয় |
+| More → **Limits** | **Reference** = default (পড়া যায়, বদলানো যায় না)। **Manual** চাপলে নিজের মান লিখুন, যেমন চুক্তির মান। ফল, চার্ট ও PDF সব সেই সীমা নেয় |
+| Results → **Charts** | ক্লিক বা ট্যাপ করলে নিচে সময়, মান, অবস্থান, গতি ও ধাপ। মাউসে টেনে জুম, **Ctrl + চাকা** জুম, **Shift + চাকা** সরানো, ফোনে দুই আঙুলে জুম ও এক আঙুলে সরানো, ডাবল-ক্লিক বা ⟲ = রিসেট। **Y** = হাতে স্কেল। **ISO-weighted / Unfiltered**, **Grid / Stacked**, **Limit lines** |
+| Results → **Vibration source finder** | সম্ভাব্য কারণ (High / Medium / Low), প্রমাণ ও "Check:" তালিকা। নিচে বড় ঘটনার উচ্চতা ও spectrum peak, আর প্রতিটি peak-এর "Rolling Ø" (গাড়ির গতিতে ঘুরলে ওই অংশের ব্যাস কত হতো) |
+| History → **Compare** | একই লিফটের ২টি বা বেশি রানে টিক দিয়ে **Compare selected** চাপুন। Up ও Down দুই দিকে একই উচ্চতায় কম্পন হলে = শ্যাফটের জিনিস (রেল জোড়, ব্র্যাকেট, সিল)। আলাদা গতির রানে (যেমন inspection) ফ্রিকোয়েন্সি গতির সঙ্গে বদলালে = ঘুরন্ত অংশ, না বদলালে = স্থির অনুরণন |
+
+**উৎস খোঁজার সেরা পদ্ধতি:** একই দুই তলার মধ্যে **Up ও Down** রান নিন, সম্ভব হলে একটি রান **ভিন্ন গতিতে** (inspection) নিন, Lift data পূরণ করুন, তারপর Compare করুন।
+
+**সীমাবদ্ধতা (সোজাসুজি):**
+- ফোনের sensor প্রায় 0.5–80 Hz দেখে। bearing বা inverter carrier-এর মতো উঁচু ফ্রিকোয়েন্সি ধরা পড়ে না।
+- ফোনের মাইক্রোফোন class 1/2 sound level meter নয়। ক্যালিব্রেশনের পরেও মান নির্দেশক।
+- উৎস-বিশ্লেষণ **সম্ভাব্য** কারণ দেয়। যন্ত্রাংশ বদলানোর আগে সাইটে নিশ্চিত হোন।
+- ISO 18738 শুধু মাপার পদ্ধতি দেয়, pass/fail সীমা দেয় না। Reference সেটে গতির 92–105 % ও acceleration 1.5 m/s² GB/T 10058 থেকে। বাকিগুলো প্রচলিত screening মান, চুক্তির সঙ্গে মিলিয়ে নিন।
 
 ---
 
@@ -354,6 +428,15 @@ repo আগে থেকে থাকলে নতুন repo বানাতে
 | ✅ Actions ট্যাবে "Get started with GitHub Actions", কোনো build নেই | `.github` ফোল্ডার আপলোড হয়নি, কারণ ডট-দিয়ে-শুরু লুকানো ফোল্ডার ড্র্যাগ-আপলোডে বাদ পড়ে | **set up a workflow yourself** চাপুন, নাম `build-apk.yml` দিন, লেখা পেস্ট করে Commit |
 | ✅ ধাপ ২: `নেই: .java-version` | একই কারণ: লুকানো ফাইল বাদ পড়েছে | **Add file → Create new file**, নাম `.java-version`, ভেতরে `21` |
 | ✅ Sensor check "Keep the phone flat…"-এ আটকে থাকে | v2.0.0-এ native `start()` উত্তর না দিলে অপেক্ষা চলতেই থাকত | v2.0.1 থেকে ঠিক: সময়সীমা আছে, ধাপের নাম দেখায়, দরকারে WebView sensor-এ চলে যায় |
+| ✅ Pages: `Found 0 artifact(s)` / `No artifacts named "github-pages"` | `pages.yml`-এ ফাইল তোলা ও প্রকাশ একই job-এ ছিল | v2.1.1 থেকে দুই job (`build`, তারপর `deploy`) এবং `actions: read` অনুমতি। নতুন `pages.yml` দিয়ে বদলান |
+| ফোনে "Update available" আসে না | Signing key secrets নেই, তাই Release প্রকাশ হয়নি (Actions সারাংশে ⚠), অথবা অ্যাপটি পুরোনো debug APK | অংশ ক২-এর ধাপ ২ ও ৩। Releases পাতায় সর্বশেষ APK আছে কি না দেখুন। More → **Check for updates** চাপলে কারণ লেখা আসে |
+| ধাপ 14b: `Release প্রকাশ ব্যর্থ` / `403` | Workflow-এর token-এর লেখার অনুমতি নেই | **Settings → Actions → General → Workflow permissions → Read and write → Save**, তারপর আবার চালান |
+| আপডেট ইনস্টলে "App not installed" | ফোনের অ্যাপ অন্য চাবিতে sign করা (পুরোনো debug APK) | একবার uninstall করে Releases-এর APK বসান। এরপর আর হবে না |
+| Sound card নেই / "Sound not recorded" | মাইক্রোফোনের অনুমতি দেওয়া হয়নি, বা "Record sound level" বন্ধ | Android **Settings → Apps → Lift Ride Test → Permissions → Microphone → Allow**। Measure-এ টিক দিন |
+| শব্দের মান অস্বাভাবিক (খুব কম বা বেশি) | ক্যালিব্রেশন হয়নি (ডিফল্ট offset আনুমানিক) | More → Sound level → meter-এর মান দিয়ে **Calibrate** |
+| Source finder: "No clear pattern" | Lift data নেই, বা একটিমাত্র রান | Lift data পূরণ করুন, Up ও Down রান নিয়ে **Compare** করুন |
+| চার্টে মাউসের চাকা ঘোরালে জুম হয় না | ইচ্ছাকৃত: সাধারণ চাকা পাতা স্ক্রল করে | **Ctrl + চাকা** দিয়ে জুম, অথবা টেনে বাক্স জুম, বা ＋ বোতাম |
+| ✅ `.github/workflows`-এর ভেতরে বাড়তি `www` ফোল্ডার | আপলোডের সময় `workflows` পাতায় ছিলেন। GitHub ফাইল রাখে যে ফোল্ডারের পাতায় আছেন সেখানে | ওই ফোল্ডারে ডানের **… → Delete directory → Commit**। আপলোডের আগে ঠিকানায় শুধু `github.com/Saiful44711/Lift-Ride-Test` আছে কি না দেখুন |
 | ✅ `www` ফোল্ডারে `config.js` নেই | repo-তে এখনো আগের সংস্করণ আছে, নতুন প্যাকেজ আপলোড হয়নি | অংশ **ক১**: zip-এর ভেতরের সবকিছু repo-র মূল পাতায় **Upload files** দিয়ে তুলুন |
 | ✅ পাশাপাশি রাখা দুই ফোনের ফল পুরো মেলে না | রান আলাদা (UP বনাম DOWN, আলাদা সময়)। একটি ফোনে barometer নেই বলে উচ্চতা/গতিতে drift। sensor noise আলাদা। Max p-p একটি স্পাইকেই বদলায় | দুই ফোন একসঙ্গে Start করে একই রান মাপুন। barometer নেই এমন ফোনে আসল Travel height বসান। তুলনা করুন A95 মান দিয়ে, Max দিয়ে নয় |
 | ✅ Vibration গ্রাফের শুরুতে বড় spike (±250 mg), বাকি গ্রাফ চ্যাপ্টা | Start চাপার ঝাঁকুনি বা ফোনের প্রথম কয়েকটি sample ফিল্টারের মাধ্যমে still window-তে ছড়িয়ে পড়ত। এতে noise floor-ও বেশি দেখাত | v2.1.1 থেকে ঠিক: প্রথম 0.5 s ফিল্টারের আগে স্থির মানে রাখা হয় |
@@ -424,7 +507,18 @@ repo আগে থেকে থাকলে নতুন repo বানাতে
     - আসল `fetch` পথ দিয়ে নকল Apps Script URL-এ পরীক্ষা।
 - Screenshot দেখা হয়েছে: sign in ও request (মোবাইল dark), Admin (ডেস্কটপ light ও dark, মোবাইল)। `pages.yml` পার্স হয়েছে (৫ ধাপ)।
 
+- **v2.2:** `tests/e2e-v22.js`-এ ৪০টির মতো চেক পাস। এর মধ্যে আছে:
+    - DEMO শব্দ ও চার অংশ, সীমা-সেট Reference/Manual, % Limit, স্থির রেল-জোড় খুঁজে পাওয়া।
+    - চার্টে ক্লিক-readout (সময়, মান, অবস্থান, গতি, ধাপ), সব চার্টে একই cursor, ＋/←/⟲, টেনে বাক্স-জুম, Ctrl+চাকা, হাতে Y-scale, ±(সীমা÷2) রেখা, Unfiltered, Stacked।
+    - নকল মাইক্রোফোনে ক্যালিব্রেশন, PDF ৫ পাতা, দুই রানের Compare (৫ m পরপর জোড় Up ও Down দুই দিকে)।
+    - PC-তে Update bar ও Later, ফোনের Release-খোঁজা (নকল GitHub উত্তর), একই সংস্করণে bar না আসা।
+- Source finder-এর নিয়ম Node-এ সিমুলেশনে পরীক্ষা: রেল-জোড় ছাড়া রানে ভুল "rail joint" আসেনি, জোড় থাকলে ৮টির মধ্যে ৭টিতে 4.95–5.05 m পাওয়া গেছে।
+- `inject-native.sh` নকল android ফোল্ডারে চালানো (আইকন, splash, RECORD_AUDIO)। workflow-এর 7b ধাপ ও pages-এর 2b ধাপ নকল ফাইলে চালানো। YAML পার্স হয়েছে।
+- Screenshot দেখা হয়েছে: চার্ট (ডেস্কটপ light ও dark, মোবাইল dark), source finder, PDF-এর পাতাগুলো, Android আইকন।
+
 **যাচাই করা যায়নি:**
+
+- **v2.2:** আসল APK-তে মাইক্রোফোন (Capacitor WebView অনুমতি চাওয়া), আসল ফোনের শব্দের মাত্রা, Release signing ও `gh release` আসল GitHub-এ, ফোনে ডাউনলোড ও Install প্রবাহ, আসল লিফটে source finder-এর নির্ভুলতা, নতুন আইকন ও splash আসল Android-এ কেমন দেখায়।
 
 - **আসল Google-এ deploy**: Apps Script-এর অনুমতি, Gmail পাঠানো, Drive-এ লেখা, আসল URL-এ CORS বা redirect, আর Google-এর দৈনিক সীমা। প্রথমবার চালিয়ে কোনো ত্রুটি এলে বার্তাটি পাঠান।
 - APK-এর WebView থেকে `script.google.com`-এ আসল অনুরোধ।

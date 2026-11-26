@@ -115,14 +115,15 @@
 
   function startDemo(opts, onBatch, onDone) {
     var seed = opts.seed || (Date.now() % 100000), up = (seed % 2) === 0;
-    var raw = opts.still ? root.LiftCore.simulateStill(opts.still, { rate: 100, seed: seed }) : root.LiftCore.simulateRun({ seed: seed, rate: 100, up: up, height: 28 + (seed % 9), vmax: 2.0 + (seed % 3) * 0.5, jmax: 1.0 + (seed % 4) * 0.1, baro: true });
-    var speed = opts.speed || 1, t0 = performance.now(), i = 0, j = 0, timer, finished = false;
+    var raw = opts.still ? root.LiftCore.simulateStill(opts.still, { rate: 100, seed: seed }) : root.LiftCore.simulateRun({ seed: seed, rate: 100, up: up, height: 28 + (seed % 9), vmax: 2.0 + (seed % 3) * 0.5, jmax: 1.0 + (seed % 4) * 0.1, baro: true, sound: true, joints: { every: 5, amp: 0.22 } });
+    var speed = opts.speed || 1, t0 = performance.now(), i = 0, j = 0, q = 0, timer, finished = false, snd = raw.snd || { t: [], l: [] };
     var tEnd = raw.t[raw.t.length - 1];
     raw.pt = raw.pt || []; raw.p = raw.p || [];
     function tick() {
       var simT = (performance.now() - t0) / 1000 * speed, b = { t: [], ax: [], ay: [], az: [], pt: [], p: [] };
       while (i < raw.t.length && raw.t[i] <= simT) { b.t.push(raw.t[i]); b.ax.push(raw.ax[i]); b.ay.push(raw.ay[i]); b.az.push(raw.az[i]); i++; }
       while (j < raw.pt.length && raw.pt[j] <= simT) { b.pt.push(raw.pt[j]); b.p.push(raw.p[j]); j++; }
+      if (snd.t.length) { b.st = []; b.sl = []; b.sref = 'spl'; while (q < snd.t.length && snd.t[q] <= simT) { b.st.push(snd.t[q]); b.sl.push(snd.l[q]); q++; } }
       if (b.t.length) onBatch(b);
       if (!finished && simT > tEnd) { finished = true; clearInterval(timer); if (onDone) onDone(); }
     }

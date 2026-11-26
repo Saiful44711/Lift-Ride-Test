@@ -13,6 +13,8 @@ function check(name, ok, info) { console.log((ok ? 'PASS ' : 'FAIL ') + name + (
   const errors = [];
   async function newPage(vw, vh, scheme, q) {
     const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, colorScheme: scheme, acceptDownloads: true, deviceScaleFactor: 2 });
+    // the repository config.js holds the real team cloud URL; local tests run without it
+    await ctx.route('**/config.js', r => r.fulfill({ contentType: 'application/javascript', body: 'window.LRM_CONFIG={cloudUrl:""};' }));
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
@@ -49,10 +51,10 @@ function check(name, ok, info) { console.log((ok ? 'PASS ' : 'FAIL ') + name + (
   check('demo has a barometer so fusion is used', cur.method === 'fusion');
   check('height is plausible (27-37 m)', cur.m.height > 27 && cur.m.height < 37, cur.m.height.toFixed(2));
   check('meta stored: building, floors, ISO conditions', cur.meta.building === 'Test Tower' && cur.meta.floors === 'G → 12' && cur.meta.fan && cur.meta.placed);
-  check('10 charts rendered (incl. FFT)', (await page.locator('#charts canvas').count()) === 10, String(await page.locator('#charts canvas').count()));
+  check('12 charts rendered (sound, X, Y, Z, FFT ...)', (await page.locator('#charts canvas').count()) === 12, String(await page.locator('#charts canvas').count()));
   check('ISO ride-quality table has 4 rows', (await page.locator('#isoTbl tr').count()) === 5);
-  check('performance table has V95 row', (await page.locator('#perfTbl').innerText()).includes('Speed') && (await page.locator('#perfTbl tr').count()) === 7);
-  check('largest-bumps table present', (await page.locator('#bumpTbl tr').count()) >= 2);
+  check('performance table has V95 row and Average column', (await page.locator('#perfTbl').innerText()).includes('Average') && (await page.locator('#perfTbl tr').count()) === 7);
+  check('source finder spectrum-peak table present', (await page.locator('#pkTbl tr').count()) >= 2);
   const cov = await page.locator('#runsBox').innerText();
   check('UP/DOWN coverage note (ISO 18738 6.4)', /UP \d, DOWN \d/.test(cov), cov);
   await page.setViewportSize({ width: 390, height: 5200 }); await page.waitForTimeout(500);
@@ -68,9 +70,9 @@ function check(name, ok, info) { console.log((ok ? 'PASS ' : 'FAIL ') + name + (
   const [dlPdf] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('#btnPdf')]);
   const pdfPath = OUT + '/report.pdf'; await dlPdf.saveAs(pdfPath);
   check('PDF download', fs.existsSync(pdfPath) && fs.statSync(pdfPath).size > 50000, dlPdf.suggestedFilename() + ' ' + fs.statSync(pdfPath).size + ' bytes');
-  const pages = await page.evaluate(() => { const c = window.__LRM.current; return Report.render(c.res, c.meta, window.__LRM.S.limits, { up: 1, down: 0 }).map(cv => cv.toDataURL('image/png')); });
+  const pages = await page.evaluate(() => { const c = window.__LRM.current; return Report.render(c.res, c.meta, Object.assign({}, LiftCore.DEFAULT_LIMITS), { up: 1, down: 0 }, { limitSet: 'reference', source: c.src }).map(cv => cv.toDataURL('image/png')); });
   pages.forEach((d, i) => fs.writeFileSync(OUT + `/pdf_page${i + 1}.png`, Buffer.from(d.split(',')[1], 'base64')));
-  check('PDF has 4 A4 pages', pages.length === 4, String(pages.length));
+  check('PDF has 5 A4 pages', pages.length === 5, String(pages.length));
   const [dlCsv] = await Promise.all([page.waitForEvent('download'), page.click('#btnCsv')]);
   const csvPath = OUT + '/data.csv'; await dlCsv.saveAs(csvPath);
   const csv = fs.readFileSync(csvPath, 'utf8');
@@ -82,18 +84,19 @@ function check(name, ok, info) { console.log((ok ? 'PASS ' : 'FAIL ') + name + (
   check('known height (30 m) is applied', Math.abs(h2 - 30) < 0.05, h2.toFixed(2));
 
   /* ---- limits change the verdict ---- */
-  await page.click('[data-tab=more]'); await page.fill('#lJerk', '0.5'); await page.locator('#lJerk').blur(); await page.waitForTimeout(300);
+  await page.click('[data-tab=more]'); await page.click('#lsMan'); await page.fill('#lJerk', '0.5'); await page.locator('#lJerk').blur(); await page.waitForTimeout(300);
   await page.click('[data-tab=results]'); await page.waitForTimeout(200);
   const bad = await page.locator('#verdictTbl .chip.bad').count();
   check('jerk limit 0.5 shows a failed row', bad >= 1, 'bad=' + bad);
-  await page.click('[data-tab=more]'); await page.click('#btnLimitsReset');
+  await page.click('[data-tab=more]'); await page.click('#btnLimitsReset'); await page.click('#lsRef');
+  await page.click('[data-tab=measure]'); await page.click('#liftData summary');
 
   /* ---- roller guide diagnostics from settings ---- */
   await page.fill('#aRoller', '152'); await page.locator('#aRoller').blur(); await page.waitForTimeout(400);
   const diag = await page.evaluate(() => window.__LRM.current.res.diag);
   check('roller diameter gives a rotation frequency', diag.rollerHz > 3 && diag.rollerHz < 9, (diag.rollerHz || 0).toFixed(2) + ' Hz');
   await page.click('[data-tab=results]'); await page.waitForTimeout(200);
-  check('diagnostics text shows the roller frequency', (await page.locator('#diagBox').innerText()).includes('Roller guide rotation'));
+  check('FFT chart marks the roller frequency', await page.evaluate(() => { const r = window.__LRM.current.res; return Report.chartConfigs(r, LiftCore.DEFAULT_LIMITS, { lift: { rollerMm: 152 } }).some(c => c.id === 'fftz' && c.cfg.vlines.some(v => /Roller/.test(v.label))); }));
 
   /* ---- sensor check (More tab) ---- */
   await page.click('[data-tab=more]'); await page.fill('#sOperator', 'Md. Saiful Islam'); await page.fill('#sInstr', 'Test phone'); await page.locator('#sInstr').blur();

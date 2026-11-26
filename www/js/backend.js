@@ -115,6 +115,7 @@
     logout: function () { cfg.token = ''; cfg.user = ''; cfg.name = ''; cfg.role = ''; cfg.exp = 0; persist(); },
     upload: function (rec) {
       var r = rec.raw, plain = { t: L.toArray(r.t), ax: L.toArray(r.ax), ay: L.toArray(r.ay), az: L.toArray(r.az), pt: L.toArray(r.pt || []), p: L.toArray(r.p || []) };
+      if (r.snd && r.snd.t && r.snd.t.length) plain.snd = { t: L.toArray(r.snd.t), l: L.toArray(r.snd.l), ref: r.snd.ref };
       return B.call('upload', { record: { clientId: rec.clientId, meta: rec.meta, summary: rec.summary, raw: plain } }, 120000);
     },
     list: function (filter) { return B.call('list', { filter: filter || {} }); },

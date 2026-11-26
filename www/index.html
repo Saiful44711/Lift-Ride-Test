@@ -21,6 +21,10 @@
     <button id="themeBtn" class="icon-btn" aria-label="Change theme (system / light / dark)" title="Theme">◐</button>
   </header>
 
+  <div id="updBar" class="update-bar" role="status" hidden>
+    <span id="updText">A new version is available.</span>
+    <span class="row gap"><button id="updBtn" class="btn primary small-btn" type="button">Update now</button><button id="updLater" class="btn small-btn" type="button">Later</button></span>
+  </div>
   <main id="main">
     <!-- ============ MEASURE ============ -->
     <section id="screen-measure" class="screen active" aria-label="Measure">
@@ -53,6 +57,19 @@
           <label class="check"><input id="fPlaced" type="checkbox"> Phone is flat on the normal floor covering, within 100 mm of the floor centre</label>
           <p class="muted small">Anything left unticked is stated as “not confirmed” in the report (ISO 18738 6.1.2 / 6.1.3 / 6.2).</p>
         </details>
+        <details class="inner" id="liftData">
+          <summary>Lift data for vibration-source analysis (optional)</summary>
+          <p class="muted small">Used to match vibration frequencies to rotating parts and repeating shaft items. Leave a field empty if you do not know it.</p>
+          <div class="grid2">
+            <label>Roping<select id="dRoping"><option value="1">1:1</option><option value="2">2:1</option><option value="4">4:1</option></select></label>
+            <label>Traction sheave diameter (mm)<input id="aSheave" type="number" inputmode="decimal" step="1" min="0" placeholder="e.g. 400"></label>
+            <label>Gear ratio <span class="muted">1 = gearless</span><input id="dGear" type="number" inputmode="decimal" step="0.01" min="1" placeholder="1"></label>
+            <label>Motor poles <span class="muted">e.g. 20 for a PM gearless</span><input id="dPoles" type="number" inputmode="numeric" step="2" min="2" placeholder="e.g. 20"></label>
+            <label>Roller guide diameter (mm) <span class="muted">roller guides only</span><input id="aRoller" type="number" inputmode="decimal" step="1" min="0" placeholder="e.g. 125"></label>
+            <label>Guide rail length (m)<input id="dRail" type="number" inputmode="decimal" step="0.1" min="0.5" placeholder="5"></label>
+            <label>Rail bracket spacing (m)<input id="dBracket" type="number" inputmode="decimal" step="0.1" min="0.5" placeholder="e.g. 2.5"></label>
+          </div>
+        </details>
         <ol class="steps small">
           <li>Put the phone <b>flat</b> on the car floor, near the centre, screen up, top edge towards the car door. Keep feet more than 150 mm away.</li>
           <li>Tap <b>Start</b> and stay <b>completely still for 3 seconds</b> (calibration). Start before the doors close.</li>
@@ -71,8 +88,10 @@
           <div><span class="k">Time</span><b id="lvT">0.0</b><small>s</small></div>
           <div id="lvBaroBox"><span class="k">Baro height</span><b id="lvB">–</b><small>m</small></div>
           <div><span class="k">Sample rate</span><b id="lvR">0</b><small>Hz</small></div>
+          <div id="lvSBox"><span class="k">Sound</span><b id="lvS">–</b><small>dB(A)</small></div>
         </div>
         <canvas id="liveChart" class="chart small-chart" aria-label="Live acceleration chart"></canvas>
+        <label class="check"><input id="fSound" type="checkbox" checked> Record sound level (microphone)</label>
         <div class="row gap">
           <button id="btnStart" class="btn primary big">Start</button>
           <button id="btnStop" class="btn danger big" disabled>Stop &amp; analyse</button>
@@ -96,20 +115,34 @@
           <h2>Ride quality (ISO 18738 5.4) — peak-to-peak, weighted, mg</h2>
           <p class="muted small">Whole-body weighted (Wd for X/Y, Wk for Z), zero-crossing method. X and Y are evaluated between boundaries 1–2; Z is split into the constant and non-constant acceleration regions.</p>
           <div class="table-wrap"><table id="isoTbl"></table></div>
+          <h3>Raw data, unfiltered (mg)</h3>
+          <p class="muted small">Gravity removed, no weighting, between boundaries 1–2. Z includes the acceleration profile.</p>
+          <div class="table-wrap"><table id="rawTbl"></table></div>
+        </div>
+        <div class="card" id="soundCard" hidden>
+          <div class="row between wrap"><h2>Sound level dB(A)</h2><span id="soundChip" class="chip"></span></div>
+          <div class="table-wrap"><table id="soundTbl"></table></div>
+          <p class="muted small" id="soundNote"></p>
         </div>
         <div class="card">
           <h2>Performance (ISO 18738 5.2, 5.3, 5.5)</h2>
           <div class="table-wrap"><table id="perfTbl"></table></div>
         </div>
         <div class="card">
-          <h2>Comparison with reference limits</h2>
-          <p class="muted small">ISO 18738 does not define acceptable values. These limits are editable reference values (More → Reference limits). Set them to your project or customer specification.</p>
+          <div class="row between wrap"><h2>Analysis against limits</h2><span id="limChip" class="chip"></span></div>
+          <p class="muted small" id="limNote"></p>
           <div class="table-wrap"><table id="verdictTbl"></table></div>
+          <button id="btnLimitsGo" class="btn small-btn" type="button">Change limits</button>
         </div>
-        <div class="card" id="diagCard">
-          <h2>Diagnostics</h2>
-          <div id="diagBox" class="small"></div>
-          <div class="table-wrap"><table id="bumpTbl"></table></div>
+        <div class="card" id="srcCard">
+          <div class="row between wrap"><h2>Vibration source finder</h2><span class="chip warn">Probable causes · verify on site</span></div>
+          <div id="srcFind"></div>
+          <h3>Largest vibration events and their position</h3>
+          <div class="table-wrap"><table id="evTbl"></table></div>
+          <h3>Spectrum peaks at steady speed</h3>
+          <div class="table-wrap"><table id="pkTbl"></table></div>
+          <div id="srcNotes" class="small muted"></div>
+          <p class="small"><a href="#" id="srcLiftLink">Enter / change the lift data</a> · Several runs: History → tick runs → Compare.</p>
         </div>
         <div class="card">
           <h2>Correct the height and recalculate</h2>
@@ -117,6 +150,16 @@
             <label class="grow">Actual travel height (m)<input id="rHeight" type="number" inputmode="decimal" step="0.01" min="0"></label>
             <button id="btnRecalc" class="btn">Recalculate</button>
           </div>
+        </div>
+        <div class="card chart-tools" id="chartTools">
+          <h2>Charts</h2>
+          <div class="row gap wrap">
+            <div class="seg" role="group" aria-label="Vibration signal"><button id="cmIso" class="seg-b active" type="button">ISO-weighted</button><button id="cmRaw" class="seg-b" type="button">Unfiltered</button></div>
+            <div class="seg" role="group" aria-label="Layout"><button id="clGrid" class="seg-b active" type="button">Grid</button><button id="clStack" class="seg-b" type="button">Stacked</button></div>
+            <label class="check"><input id="cLimits" type="checkbox" checked> Limit lines</label>
+            <button id="cReset" class="btn small-btn" type="button">Reset zoom</button>
+          </div>
+          <p class="muted small">Click or tap a curve to read time, value, lift position and speed. Drag across a chart (mouse), pinch (touch) or Ctrl + wheel to zoom; all time charts zoom together. Y on each chart sets a manual scale.</p>
         </div>
         <div class="charts" id="charts"></div>
         <div class="card">
@@ -140,8 +183,18 @@
         <input id="fileImport" type="file" accept=".json,.lrm,application/json" hidden>
         <p id="impMsg" class="muted small" role="status" aria-live="polite"></p>
         <p id="syncLine" class="muted small" hidden></p>
+        <div class="row gap wrap" id="cmpBar"><button id="btnCompare" class="btn small-btn" type="button" disabled>Compare selected (0)</button><span class="muted small">Tick 2 or more runs of the same lift (up and down, and if possible a different speed).</span></div>
         <ul id="histList" class="hist"></ul>
         <p id="histEmpty" class="muted">No records.</p>
+      </div>
+      <div class="card" id="cmpCard" hidden>
+        <div class="row between wrap"><h2>Compare runs — vibration source</h2><button id="cmpClose" class="btn small-btn" type="button">Close</button></div>
+        <div id="cmpWarn"></div>
+        <div id="cmpFind"></div>
+        <div class="table-wrap"><table id="cmpRuns"></table></div>
+        <h3>Events at the same height</h3>
+        <div class="table-wrap"><table id="cmpRec"></table></div>
+        <canvas id="cmpChart" class="chart" aria-label="Vibration events against height for the compared runs"></canvas>
       </div>
     </section>
 
@@ -237,18 +290,37 @@
         <p class="muted small" id="checkMsg" role="status" aria-live="polite"></p>
       </div>
 
-      <div class="card">
-        <h2>Reference limits (editable)</h2>
-        <p class="muted small">ISO 18738 “does not specify acceptable or unacceptable ride quality”. The defaults below are common design reference values, not requirements of the standard. Change them to match your specification.</p>
-        <div class="grid2">
+      <div class="card" id="limitsCard">
+        <h2>Limits for pass / fail</h2>
+        <p class="muted small">ISO 18738 gives the measuring method only, not acceptable values. <b>Reference</b> = default set (speed 92–105 % of rated and acceleration 1.5 m/s² as in GB/T 10058, the rest common screening values). <b>Manual</b> = your own values, e.g. from the contract.</p>
+        <div class="seg" role="group" aria-label="Limit set"><button id="lsRef" class="seg-b active" type="button">Reference (default)</button><button id="lsMan" class="seg-b" type="button">Manual</button></div>
+        <div class="grid2" id="limGrid">
+          <label>Max vertical vibration p-p (mg)<input id="lMaxv" type="number" step="1" min="0"></label>
+          <label>A95 vertical, p-p (mg)<input id="lA95v" type="number" step="1" min="0"></label>
+          <label>Max horizontal vibration p-p (mg)<input id="lMaxh" type="number" step="1" min="0"></label>
+          <label>A95 horizontal, p-p (mg)<input id="lA95h" type="number" step="1" min="0"></label>
+          <label>Max jerk (m/s³)<input id="lJerk" type="number" step="0.1" min="0"></label>
           <label>Max acceleration (m/s²)<input id="lAccel" type="number" step="0.05" min="0"></label>
           <label>Max deceleration (m/s²)<input id="lDecel" type="number" step="0.05" min="0"></label>
-          <label>Max jerk (m/s³)<input id="lJerk" type="number" step="0.1" min="0"></label>
-          <label>A95 vertical, p-p (mg)<input id="lA95v" type="number" step="1" min="0"></label>
-          <label>A95 horizontal, p-p (mg)<input id="lA95h" type="number" step="1" min="0"></label>
+          <label>Speed lower limit (% of rated)<input id="lSpeedLo" type="number" step="1" min="0"></label>
+          <label>Speed upper limit (% of rated)<input id="lSpeedHi" type="number" step="1" min="0"></label>
+          <label>Max sound, rated speed ≤ 2.5 m/s (dB(A))<input id="lSound" type="number" step="1" min="0"></label>
+          <label>Max sound, rated speed &gt; 2.5 m/s (dB(A))<input id="lSoundHi" type="number" step="1" min="0"></label>
           <label>ISO 2631-1 curve level (m/s²)<input id="lComfort" type="number" step="0.005" min="0.01"></label>
         </div>
-        <button id="btnLimitsReset" class="btn small-btn">Reset to defaults</button>
+        <button id="btnLimitsReset" class="btn small-btn">Copy reference values into Manual</button>
+        <p class="muted small" id="limMsg" role="status"></p>
+      </div>
+
+      <div class="card" id="soundSetCard">
+        <h2>Sound level (microphone)</h2>
+        <p class="muted small">The phone / PC microphone gives an <b>indicative</b> A-weighted level (FAST, 125 ms). For trustworthy values calibrate once against a sound level meter: put both side by side in a steady noise (e.g. a fan), type the meter reading and tap Calibrate.</p>
+        <div class="grid2">
+          <label>Calibration offset (dB)<input id="sOffset" type="number" step="0.1"></label>
+          <label>Sound level meter reading (dB(A))<input id="sMeter" type="number" step="0.1" placeholder="e.g. 62.0"></label>
+        </div>
+        <div class="row gap wrap"><button id="btnCal" class="btn" type="button">Calibrate (measure 5 s)</button><button id="btnSndTest" class="btn small-btn" type="button">Test microphone</button><span id="calChip" class="chip"></span></div>
+        <p class="muted small" id="calMsg" role="status" aria-live="polite"></p>
       </div>
 
       <div class="card">
@@ -256,8 +328,6 @@
         <div class="grid2">
           <label>Accel / jerk low-pass (Hz) <span class="muted">ISO 18738 = 10</span><input id="aLp" type="number" step="0.5" min="1" max="20"></label>
           <label>Barometer fusion time constant τ (s)<input id="aTau" type="number" step="0.5" min="0.5" max="10"></label>
-          <label>Roller guide diameter (mm) <span class="muted">diagnostics, optional</span><input id="aRoller" type="number" step="1" min="0" placeholder="e.g. 152"></label>
-          <label>Traction sheave diameter (mm) <span class="muted">diagnostics, optional</span><input id="aSheave" type="number" step="1" min="0" placeholder="e.g. 400"></label>
           <label class="check"><input id="aBaro" type="checkbox"> Use barometer when the phone has one</label>
         </div>
         <p class="muted small">Defaults follow the standard (10 Hz 2-pole Butterworth, τ = 2 s). A lower low-pass (e.g. 2–4 Hz) gives smoother acceleration and jerk on a noisy phone, but is no longer the ISO value.</p>
@@ -286,13 +356,15 @@
             <li><b>Vibration (p-p):</b> weighted signal; each peak-to-peak value is taken between zero crossings 1–3, 2–4, 3–5… Max is the largest, A95 is the value 95 % of them do not exceed. The 0-pk column is the largest single peak.</li>
             <li><b>Constant / non-constant region:</b> the vertical signal is split by the slope of the acceleration (above 0.3 m/s³, plus 0.5 s either side = non-constant). Door-close and start/stop transients fall in the non-constant region.</li>
             <li><b>Boundaries:</b> boundary 1 and 2 are 500 mm after the start and before the stop (from the integrated height). X and Y vibration are evaluated between them.</li>
-            <li><b>Diagnostics:</b> the FFT peaks, the hoistway positions of the largest bumps, and (if you enter diameters) the roller guide and sheave rotation frequencies f = v / (π·D).</li>
+            <li><b>Charts:</b> tap or click a curve to read time, value, the lift position in the shaft and the speed. Drag across (mouse), pinch (touch) or Ctrl + wheel to zoom; double-click or ⟲ to reset. ISO-weighted / Unfiltered switches the vibration signal, like the ISO / Raw filter of a PMT EVA. Limit lines: ±(max p-p ÷ 2) on vibration, ± limits on acceleration and jerk, 92–105 % on speed, the dB(A) limit on sound.</li>
+            <li><b>Vibration source finder:</b> looks at the axis, the ride phase, the position and the frequency of the vibration and matches them with the lift data (sheave, roping, gear, motor poles, rollers, rail length, bracket spacing). With several runs (History → Compare) it also finds heights that repeat in up and down runs and frequencies that follow the speed.</li>
           </ul>
         </details>
         <details><summary>4. Limitations (please read)</summary>
           <ul>
             <li>A phone is not a calibrated instrument. Use this for screening, comparison and troubleshooting, not for certificates or contract disputes. For traceable ISO 18738 results use a calibrated analyser.</li>
-            <li>Sound level (LAeq, max dB(A)) is not measured. The microphone of a phone is not a Type 2 sound level meter.</li>
+            <li>Sound level is measured with the device microphone. It is not a class 1/2 sound level meter: calibrate it (More → Sound level) and treat the values as indicative.</li>
+            <li>The vibration source finder lists <b>probable</b> causes with their evidence. Always confirm on site before replacing parts.</li>
             <li>Sensor noise limits small vibrations. Run the sensor check to see your phone's noise floor; values below about twice the noise floor are only indications.</li>
             <li>Phone sensors sample at up to 200 Hz, so vibration is evaluated up to about 80 Hz (40 Hz at 100 Hz sampling).</li>
             <li>ISO 18738:2003 is the edition this version follows. Later editions and ISO 8100-34 may change details.</li>
@@ -305,6 +377,7 @@
       <div class="card">
         <h2>About</h2>
         <p class="small">Lift Ride Test <span id="ver"></span><br>Design &amp; Developed by Md. Saiful Islam</p>
+        <div class="row gap wrap"><button id="btnUpdCheck" class="btn small-btn" type="button">Check for updates</button><span id="updMsg" class="muted small" role="status"></span></div>
       </div>
     </section>
   </main>
@@ -351,10 +424,15 @@
 </div>
 
 <script src="config.js"></script>
+<script src="build-info.js"></script>
 <script src="js/core.js"></script>
 <script src="js/cloudlogic.js"></script>
 <script src="js/backend.js"></script>
+<script src="js/source.js"></script>
 <script src="js/charts.js"></script>
+<script src="js/chartui.js"></script>
+<script src="js/mic.js"></script>
+<script src="js/update.js"></script>
 <script src="js/pdf.js"></script>
 <script src="js/report.js"></script>
 <script src="js/store.js"></script>

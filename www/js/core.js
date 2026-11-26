@@ -11,7 +11,9 @@
  *         zero-crossing method (Annex A), max and A95; z split into constant and non-constant
  *         acceleration regions (Annex B)
  *   5.5   velocity: integration of the 10 Hz signal, max and V95
- * Sound level (5.6) is NOT measured. Phone MEMS sensors are not calibrated instruments.
+ *   5.6   sound (v2.2): A-weighted levels from the phone / PC microphone, 125 ms blocks (FAST),
+ *         LAFmax and LAeq for pre-run, run, post-run and the full record. Indicative only until the
+ *         offset is calibrated against a sound level meter. Phone MEMS sensors are not calibrated instruments.
  *
  * Accelerometer-only operation is first-class: the standard itself obtains speed and height by
  * integrating the vertical acceleration (rest-to-rest, zero-velocity corrected). A barometer is
@@ -29,15 +31,30 @@
 
   /* ---------------- defaults ---------------- */
   // ISO 18738 does not define acceptable values ("does not specify acceptable or unacceptable ride quality").
-  // These are editable reference values for quick screening only.
+  // REFERENCE set (v2.2): speed band 92-105 % of rated and max acceleration 1.5 m/s2 as in GB/T 10058;
+  // the other values are common industry screening values. The user can switch to a MANUAL set.
   var DEFAULT_LIMITS = {
-    accel: 1.0,    // m/s2  max acceleration
-    decel: 1.0,    // m/s2  max deceleration
-    jerk: 1.5,     // m/s3  max jerk
-    a95v: 20,      // mg    A95 vertical peak-to-peak (constant-acceleration region)
-    a95h: 15,      // mg    A95 horizontal peak-to-peak
-    comfort: 0.315 // m/s2  ISO 2631-1 weighted rms: "not uncomfortable" boundary
+    accel: 1.5,     // m/s2  max acceleration
+    decel: 1.5,     // m/s2  max deceleration
+    jerk: 1.5,      // m/s3  max jerk
+    a95v: 20,       // mg    A95 vertical peak-to-peak (constant-acceleration region)
+    a95h: 15,       // mg    A95 horizontal peak-to-peak
+    maxv: 30,       // mg    max vertical peak-to-peak (constant-acceleration region)
+    maxh: 20,       // mg    max horizontal peak-to-peak
+    comfort: 0.315, // m/s2  ISO 2631-1 weighted rms: "not uncomfortable" boundary
+    sound: 55,      // dB(A) max sound level during the run (rated speed up to 2.5 m/s)
+    soundHi: 60,    // dB(A) the same above 2.5 m/s
+    speedLo: 92,    // %     of rated speed
+    speedHi: 105    // %     of rated speed
   };
+  var LIMIT_INFO = {
+    accel: ['Max acceleration', 'm/s²'], decel: ['Max deceleration', 'm/s²'], jerk: ['Max jerk', 'm/s³'],
+    a95v: ['A95 vertical vibration p-p', 'mg'], a95h: ['A95 horizontal vibration p-p', 'mg'],
+    maxv: ['Max vertical vibration p-p', 'mg'], maxh: ['Max horizontal vibration p-p', 'mg'],
+    comfort: ['ISO 2631-1 weighted rms', 'm/s²'], sound: ['Max sound level (v ≤ 2.5 m/s)', 'dB(A)'], soundHi: ['Max sound level (v > 2.5 m/s)', 'dB(A)'],
+    speedLo: ['Speed, lower limit', '% of rated'], speedHi: ['Speed, upper limit', '% of rated']
+  };
+  var PHASES = ['still', 'acceleration', 'steady speed', 'deceleration'];
   var DEFAULTS = {
     fs: 0,            // 0 = automatic (50 / 100 / 200 Hz)
     calibStart: 0.5,  // s  skip (touch of the Start button)
@@ -53,6 +70,7 @@
     ratedSpeed: null,
     rollerDiaMm: null,  // diagnostics (EVA-style): roller guide diameter
     sheaveDiaMm: null,  // diagnostics: traction sheave diameter
+    soundOffset: 0,     // dB added to microphone levels stored as dBFS(A) (calibration)
     limits: DEFAULT_LIMITS
   };
 
@@ -603,6 +621,41 @@
     var bumps = [];
     for (i = 0; i < ev.length && bumps.length < 5; i++) { if (!bumps.some(function (x) { return Math.abs(x.t - ev[i].t) < 0.5; })) bumps.push(ev[i]); }
 
+    /* --- position, phase (for chart read-out and source analysis) --- */
+    var phase = new Uint8Array(n);
+    for (i = tv0; i <= tv1; i++) phase[i] = (vd[i] >= 0.9 * vpk && Math.abs(afl[i]) < cAcc) ? 2 : (i < mid ? 1 : 3);
+    var pos = new Float64Array(n), posAbs = new Float64Array(n);
+    for (i = 0; i < n; i++) { var hc = Math.min(Math.max(hp[i], 0), hTot); pos[i] = hc; posAbs[i] = dir > 0 ? hc : hTot - hc; }
+    // PMT-style "raw data" (unfiltered, gravity removed): Z includes the acceleration profile
+    var rawSt = function (sig) { var lv = ppLevels(sig, b1, b2), q = ppSummary(lv, null); return { max: q.max, a95: q.a95, zp: zeroPeak(sig, null, b1, b2) }; };
+    var rawStats = { z: rawSt(Float64Array.from(av, function (x2, k2) { return (k2 >= s && k2 <= e) ? x2 - bias : 0; })), x: rawSt(h1), y: rawSt(h2) };
+    var aAvg = 0, dAvg = 0;
+    if (i5 >= 0 && i95 > i5) aAvg = mean(afl, i5, i95 + 1);
+    if (d95 >= 0 && d5 > d95) dAvg = -mean(afl, d95, d5 + 1);
+    bb.z.zp = zeroPeak(vz, cons, b1, b2); bb.x.zp = zeroPeak(vx, null, b1, b2); bb.y.zp = zeroPeak(vy, null, b1, b2);
+
+    /* --- sound (v2.2): 125 ms A-weighted block levels --- */
+    var sound = null;
+    if (raw.snd && raw.snd.t && raw.snd.t.length > 4) {
+      var off = raw.snd.ref === 'spl' ? 0 : (o.soundOffset || 0), stt = [], sl = [];
+      for (i = 0; i < raw.snd.t.length; i++) {
+        var tq = raw.snd.t[i] - t0, lq = raw.snd.l[i];
+        if (tq < 0 || tq > T || !isFinite(lq)) continue;
+        stt.push(tq); sl.push(lq + off);
+      }
+      var reg = function (a, b) {
+        var mx = -Infinity, en = 0, cn = 0;
+        for (var q2 = 0; q2 < stt.length; q2++) if (stt[q2] >= a && stt[q2] <= b) { if (sl[q2] > mx) mx = sl[q2]; en += Math.pow(10, sl[q2] / 10); cn++; }
+        return cn ? { max: mx, leq: 10 * Math.log10(en / cn), n: cn } : null;
+      };
+      if (stt.length > 4) {
+        var tRun0 = tv0 / fs, tRun1 = tv1 / fs;
+        sound = { t: stt, l: sl, ref: raw.snd.ref || 'dbfs', offset: off, calibrated: raw.snd.ref === 'spl' ? false : !!o.soundCalibrated, demo: raw.snd.ref === 'spl',
+          run: reg(tRun0, tRun1), pre: reg(o.calibStart, tRun0), post: reg(tRun1, T), full: reg(o.calibStart, T) };
+        if (!sound.run) sound = null;
+      }
+    }
+
     /* --- result --- */
     var res = {
       version: 2, standard: 'ISO 18738:2003',
@@ -612,8 +665,10 @@
       series: {
         av: Float64Array.from(av, function (x, k) { return (k >= s && k <= e) ? x - bias : 0; }),
         afl: afl, jerk: jerk, v: v, h: h, hb: hb, hAccel: hA, h1: h1, h2: h2,
-        vz: vz, vx: vx, vy: vy, wz: wz, wx: wx, wy: wy, nonc: nonc, cons: cons
+        vz: vz, vx: vx, vy: vy, wz: wz, wx: wx, wy: wy, nonc: nonc, cons: cons,
+        pos: pos, posAbs: posAbs, phase: phase, vd: vd
       },
+      sound: sound,
       m: {
         height: Math.abs(dh), direction: dir > 0 ? 'up' : 'down',
         vPeak: vpk, v95: v95, v95ok: v95ok, rideTime: (tv1 - tv0) / fs,
@@ -622,7 +677,9 @@
         x: { max: xS.max, a95: xS.a95, zp: zpX }, y: { max: yS.max, a95: yS.a95, zp: zpY },
         zC: { max: zC.max, a95: zC.a95, zp: zpZ, n: zC.n }, zN: { max: zN.max, a95: zN.a95, zp: zpZN, n: zN.n },
         a95z: zC.a95, a95x: xS.a95, a95y: yS.a95, maxppZ: zC.max, maxppX: xS.max, maxppY: yS.max, maxppZN: zN.max,
-        bb: { z: { max: bb.z.max, a95: bb.z.a95 }, x: { max: bb.x.max, a95: bb.x.a95 }, y: { max: bb.y.max, a95: bb.y.a95 } },
+        bb: { z: { max: bb.z.max, a95: bb.z.a95, zp: bb.z.zp }, x: { max: bb.x.max, a95: bb.x.a95, zp: bb.x.zp }, y: { max: bb.y.max, a95: bb.y.a95, zp: bb.y.zp } },
+        raw: rawStats, aAvg: aAvg, dAvg: dAvg,
+        travel: hTot, tMotion0: tv0 / fs, tMotion1: tv1 / fs, cAcc: cAcc,
         noiseFloorZ: nfZ, noiseFloorH: nfH,
         awZ: awZ, awX: awX, awY: awY, awMax: awMax, comfort: comfort.text, comfortLevel: comfort.level,
         constStart: cs0 / fs, constEnd: cs1 / fs, constFound: constFound,
@@ -635,25 +692,38 @@
       diag: diag,
       spectrum: spectrum,
       warnings: warnings,
-      opts: { lpDyn: lpHz, vibLo: o.vibLo, tau: o.tau, knownHeight: o.knownHeight, ratedSpeed: o.ratedSpeed, rollerDiaMm: o.rollerDiaMm, sheaveDiaMm: o.sheaveDiaMm }
+      opts: { lpDyn: lpHz, vibLo: o.vibLo, tau: o.tau, knownHeight: o.knownHeight, ratedSpeed: o.ratedSpeed, rollerDiaMm: o.rollerDiaMm, sheaveDiaMm: o.sheaveDiaMm, soundOffset: o.soundOffset },
+      limits: o.limits, limitSet: o.limitSet || 'reference'
     };
-    res.verdicts = evaluate(res.m, o.limits, o.ratedSpeed);
+    res.verdicts = evaluate(res.m, o.limits, o.ratedSpeed, sound);
     return res;
   }
 
   /* ---------------- comparison with editable reference limits ---------------- */
-  function evaluate(m, L, rated) {
+  function evaluate(m, L, rated, sound) {
+    L = Object.assign({}, DEFAULT_LIMITS, L || {});
     var list = [
-      { key: 'accel', label: 'Max acceleration', value: m.aMax, limit: L.accel, unit: 'm/s²', dp: 2 },
-      { key: 'decel', label: 'Max deceleration', value: m.dMax, limit: L.decel, unit: 'm/s²', dp: 2 },
-      { key: 'jerk', label: 'Max jerk', value: m.jMax, limit: L.jerk, unit: 'm/s³', dp: 1 },
+      { key: 'maxz', label: 'Max vertical vibration p-p (ISO-weighted)', value: m.maxppZ, limit: L.maxv, unit: 'mg', dp: 1 },
       { key: 'a95z', label: 'A95 vertical vibration, constant-accel. region (p-p)', value: m.a95z, limit: L.a95v, unit: 'mg', dp: 1 },
+      { key: 'maxx', label: 'Max horizontal X p-p (ISO-weighted)', value: m.maxppX, limit: L.maxh, unit: 'mg', dp: 1 },
       { key: 'a95x', label: 'A95 horizontal X (p-p)', value: m.a95x, limit: L.a95h, unit: 'mg', dp: 1 },
+      { key: 'maxy', label: 'Max horizontal Y p-p (ISO-weighted)', value: m.maxppY, limit: L.maxh, unit: 'mg', dp: 1 },
       { key: 'a95y', label: 'A95 horizontal Y (p-p)', value: m.a95y, limit: L.a95h, unit: 'mg', dp: 1 },
+      { key: 'jerk', label: 'Max jerk', value: m.jMax, limit: L.jerk, unit: 'm/s³', dp: 2 },
+      { key: 'accel', label: 'Max acceleration', value: m.aMax, limit: L.accel, unit: 'm/s²', dp: 3 },
+      { key: 'decel', label: 'Max deceleration', value: m.dMax, limit: L.decel, unit: 'm/s²', dp: 3 },
       { key: 'aw', label: 'ISO 2631-1 weighted rms (worst axis)', value: m.awMax, limit: L.comfort, unit: 'm/s²', dp: 3 }
     ];
-    list.forEach(function (it) { it.ok = it.value <= it.limit; });
-    if (rated) list.push({ key: 'rated', label: 'Peak speed vs rated ' + rated + ' m/s', value: m.vPeak, limit: rated, unit: 'm/s', dp: 2, ok: Math.abs(m.vPeak - rated) <= 0.05 * rated, band: true });
+    if (sound && sound.run) {
+      var hi = m.vPeak > 2.5, sl = hi ? L.soundHi : L.sound;
+      list.push({ key: 'sound', label: 'Max sound level during the run' + (sound.demo ? ' (DEMO)' : sound.calibrated ? '' : ' (uncalibrated)'), value: sound.run.max, limit: sl, unit: 'dB(A)', dp: 1, db: true });
+    }
+    list.forEach(function (it) { it.ok = it.value <= it.limit; it.pct = it.db ? null : (it.limit > 0 ? it.value / it.limit * 100 : null); it.margin = it.db ? it.value - it.limit : null; });
+    if (rated) {
+      var pc = m.vPeak / rated * 100;
+      list.push({ key: 'rated', label: 'Peak speed vs rated ' + rated + ' m/s', value: m.vPeak, limit: rated, unit: 'm/s', dp: 2, pct: pc,
+        lo: L.speedLo, hi: L.speedHi, ok: pc >= L.speedLo && pc <= L.speedHi, band: true });
+    }
     return list;
   }
 
@@ -725,7 +795,7 @@
   function simulateRun(p) {
     p = Object.assign({ height: 36, vmax: 2.5, amax: 1.0, jmax: 1.2, rate: 100, baroRate: 25, still0: 4.0, still1: 3.0, up: true, seed: 7, baro: true,
       vibZ: [[8, 0.035], [17, 0.025]], vibH: [[1.6, 0.04], [5.5, 0.03]], noise: 0.02, bias: [0.05, -0.04, 0.08], tilt: [4, 3], baroSigma: 0.02,
-      door: false, bump: null }, p || {});
+      door: false, bump: null, joints: null, sound: false }, p || {});
     var rnd = mulberry32(p.seed), gauss = function () { return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(2 * Math.PI * rnd()); };
     var tj = p.amax / p.jmax, tc = Math.max(0, p.vmax / p.amax - tj);
     var Tacc = 2 * tj + tc, dAcc = p.vmax * Tacc / 2, tcr = (p.height - 2 * dAcc) / p.vmax;
@@ -754,10 +824,26 @@
       if (p.door && tt > p.still0 - 0.7 && tt < p.still0 - 0.2) vib += 0.08 * Math.sin(2 * Math.PI * 12 * tt) * Math.sin(Math.PI * (tt - (p.still0 - 0.7)) / 0.5);
       // a single rail-joint bump at the given time into the constant-speed part
       if (p.bump && tt > p.still0 + p.bump.t && tt < p.still0 + p.bump.t + 0.12) vib += p.bump.amp * Math.sin(2 * Math.PI * 9 * (tt - p.still0 - p.bump.t)) * Math.sin(Math.PI * (tt - p.still0 - p.bump.t) / 0.12);
+      // v2.2: rail-joint style bumps at fixed positions in the shaft (every p.joints.every metres)
+      if (p.joints && mot) {
+        var hNow = at(pos, tt), ve = at(vel, tt), hAbs = p.up ? hNow : pp - hNow, jw = 0.10 * Math.max(0.3, ve);
+        var jk = Math.round((hAbs - (p.joints.offset || 0)) / p.joints.every), dj = hAbs - (p.joints.offset || 0) - jk * p.joints.every;
+        if (Math.abs(dj) < jw && ve > 0.3) { var env = Math.cos(Math.PI * dj / (2 * jw)); hx += p.joints.amp * env * Math.sin(2 * Math.PI * 7 * tt); vib += p.joints.amp * 0.2 * env * Math.sin(2 * Math.PI * 11 * tt); }
+      }
       var wx = hx, wy = hy, wz = G0 + az0 + vib;
       var x1 = cth * wx + sth * wz, y1 = wy, z1 = -sth * wx + cth * wz;
       var dx = x1, dy = cph * y1 - sph * z1, dz = sph * y1 + cph * z1;
       raw.t.push(ts); raw.ax.push(dx + p.bias[0] + gauss() * p.noise); raw.ay.push(dy + p.bias[1] + gauss() * p.noise); raw.az.push(dz + p.bias[2] + gauss() * p.noise);
+    }
+    if (p.sound) {
+      // DEMO sound (fictional): background + speed-dependent running noise + a door chime after the stop
+      raw.snd = { t: [], l: [], ref: 'spl' };
+      for (var ts2 = 0; ts2 <= total; ts2 += 0.125) {
+        var vs2 = (ts2 >= p.still0 && ts2 <= p.still0 + T) ? at(vel, ts2) / p.vmax : 0, tAfter = ts2 - (p.still0 + T);
+        var lv2 = 10 * Math.log10(Math.pow(10, 4.6) + Math.pow(10, (44 + 10 * vs2) / 10) * (vs2 > 0 ? 1 : 0.0001));
+        if (tAfter > 0.8 && tAfter < 2.2) lv2 = Math.max(lv2, 64 - 6 * Math.abs(tAfter - 1.2));
+        raw.snd.t.push(ts2); raw.snd.l.push(lv2 + gauss() * 0.6);
+      }
     }
     if (p.baro) {
       var db = 1 / p.baroRate;
@@ -770,7 +856,7 @@
   }
 
   return {
-    G0: G0, MG: MG, DEFAULTS: DEFAULTS, DEFAULT_LIMITS: DEFAULT_LIMITS, COMFORT: COMFORT, W_PARAMS: W_PARAMS,
+    G0: G0, MG: MG, DEFAULTS: DEFAULTS, DEFAULT_LIMITS: DEFAULT_LIMITS, LIMIT_INFO: LIMIT_INFO, PHASES: PHASES, COMFORT: COMFORT, W_PARAMS: W_PARAMS,
     analyze: analyze, evaluate: evaluate, toCSV: toCSV, staticCheck: staticCheck, simulateRun: simulateRun, simulateStill: simulateStill,
     weightMag: weightMag, weightedRms: weightedRms, weightSignal: weightSignal, comfortOf: comfortOf, round: round,
     util: { mean: mean, std: std, percentile: percentile, butter: butter, filtfilt: filtfilt, lowpass: lowpass, bandpass: bandpass, isoLowpass: isoLowpass,

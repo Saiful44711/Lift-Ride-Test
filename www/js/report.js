@@ -9,52 +9,76 @@
 
   var T = {
     time: 'Time (s)', speed: 'Speed (m/s)', height: 'Travelled height (m)', accel: 'Acceleration along travel, 10 Hz filtered (m/s²)', jerk: 'Jerk (m/s³)',
-    vibz: 'Vertical vibration, ISO-weighted (mg)', vibh: 'Horizontal vibration, ISO-weighted (mg)',
+    vibz: 'Vertical Z, ISO-weighted (mg)', vibx: 'Horizontal X front-back, ISO-weighted (mg)', viby: 'Horizontal Y side-side, ISO-weighted (mg)',
+    rawz: 'Vertical Z, unfiltered (mg)', rawx: 'Horizontal X front-back, unfiltered (mg)', rawy: 'Horizontal Y side-side, unfiltered (mg)',
+    sound: 'Sound level LAF (dB(A))',
     fftz: 'Vertical FFT amplitude, steady speed (mg)', ffth: 'Horizontal FFT amplitude, steady speed (mg)', fftx: 'Frequency (Hz)', ffty: 'Amplitude (mg, peak)',
     specz: 'Vertical 1/3-octave spectrum vs ISO 2631-1 (Wk) curves', spech: 'Horizontal 1/3-octave spectrum vs ISO 2631-1 (Wd) curves',
     freq: '1/3-octave centre frequency (Hz)', ylev: 'Band rms (mg)',
-    used: 'Used', baro: 'Barometer', meas: 'Measured', iso1: 'ISO curve ', limitUp: 'Accel limit', limitDn: 'Decel limit', jl: 'Jerk limit',
+    used: 'Used', baro: 'Barometer', meas: 'Measured', iso1: 'ISO curve ', limitUp: 'Accel limit', limitDn: 'Decel limit', jl: 'Jerk limit ±',
     x: 'X (front-back)', y: 'Y (side-side)', z: 'Vertical', b1: 'B1', b2: 'B2'
   };
+  function f1(v) { return (v === null || v === undefined || !isFinite(v)) ? '–' : v.toFixed(1); }
 
-  // [{id,title,cfg}]
-  function chartConfigs(res, L) {
-    var S = res.series, m = res.m, id = res.idx, dir = m.direction === 'up' ? 1 : -1;
+  // opt: {mode: 'iso'|'raw', lift: lift data, limits: true/false}
+  // returns [{id, title, group: 'time'|'freq', cfg}]
+  function chartConfigs(res, L, opt) {
+    opt = opt || {}; L = Object.assign({}, root.LiftCore ? root.LiftCore.DEFAULT_LIMITS : {}, L || {});
+    var S = res.series, m = res.m, id = res.idx, dir = m.direction === 'up' ? 1 : -1, raw = opt.mode === 'raw', showL = opt.limits !== false;
     var tt = res.t, list = [], i;
     var tRange = { xmin: 0, xmax: tt[tt.length - 1] };
     var s0 = S.h[id.s];
     var v = scaleArr(S.v, dir), h = new Float64Array(S.h.length);
     for (i = 0; i < h.length; i++) h[i] = (S.h[i] - s0) * dir;
-    list.push({ id: 'speed', title: T.speed, cfg: Object.assign({ title: T.speed, xlabel: T.time, series: [{ x: tt, y: v, label: T.used }] }, tRange) });
+    var marks = [{ x: m.tB1, label: T.b1 }, { x: m.tB2, label: T.b2 }];
+    if (m.constFound) { marks.push({ x: m.constStart, label: '', color: '#8a96a3' }); marks.push({ x: m.constEnd, label: '', color: '#8a96a3' }); }
+    function T0(o) { return Object.assign({ xlabel: T.time, vlines: marks }, tRange, o); }
+    var sl = [];
+    if (showL && res.opts.ratedSpeed) { var r0 = res.opts.ratedSpeed; sl = [{ y: r0 * L.speedHi / 100, label: L.speedHi + ' % of rated' }, { y: r0 * L.speedLo / 100, label: L.speedLo + ' % of rated' }]; }
+    list.push({ id: 'speed', group: 'time', title: T.speed, cfg: T0({ title: T.speed, stats: 'Max ' + m.vPeak.toFixed(2) + ' · V95 ' + m.v95.toFixed(2) + ' m/s', series: [{ x: tt, y: v, label: T.used }], hlines: sl }) });
     var hs = [{ x: tt, y: h, label: T.used }];
     if (S.hb) hs.push({ x: tt, y: scaleArr(S.hb, dir), label: T.baro, dash: true, width: 1.2 });
-    list.push({ id: 'height', title: T.height, cfg: Object.assign({ title: T.height, xlabel: T.time, series: hs }, tRange) });
-    list.push({ id: 'accel', title: T.accel, cfg: Object.assign({ title: T.accel, xlabel: T.time, symmetricY: true,
-      series: [{ x: tt, y: S.afl, label: T.accel }],
-      hlines: [{ y: L.accel, label: T.limitUp + ' ' + L.accel }, { y: -L.decel, label: T.limitDn + ' ' + L.decel }] }, tRange) });
-    list.push({ id: 'jerk', title: T.jerk, cfg: Object.assign({ title: T.jerk, xlabel: T.time, symmetricY: true,
-      series: [{ x: tt, y: S.jerk, label: T.jerk }],
-      hlines: [{ y: L.jerk, label: T.jl + ' ' + L.jerk }, { y: -L.jerk, label: T.jl + ' ' + L.jerk }] }, tRange) });
-    var vl = [{ x: m.tB1, label: T.b1 }, { x: m.tB2, label: T.b2 }];
-    list.push({ id: 'vibz', title: T.vibz, cfg: Object.assign({ title: T.vibz, xlabel: T.time, symmetricY: true, series: [{ x: tt, y: scaleArr(S.wz, MG), label: T.z }], vlines: vl }, tRange) });
-    list.push({ id: 'vibh', title: T.vibh, cfg: Object.assign({ title: T.vibh, xlabel: T.time, symmetricY: true,
-      series: [{ x: tt, y: scaleArr(S.wx, MG), label: T.x }, { x: tt, y: scaleArr(S.wy, MG), label: T.y }], vlines: vl }, tRange) });
+    list.push({ id: 'height', group: 'time', title: T.height, cfg: T0({ title: T.height, stats: 'Travel ' + m.height.toFixed(2) + ' m', series: hs }) });
+    if (res.sound) {
+      var so = res.sound, hiS = m.vPeak > 2.5 ? L.soundHi : L.sound;
+      list.push({ id: 'sound', group: 'time', title: T.sound, cfg: T0({ title: T.sound + (so.demo ? ' · DEMO' : so.calibrated ? '' : ' · uncalibrated'),
+        stats: 'Run max ' + f1(so.run.max) + ' · Run LAeq ' + f1(so.run.leq) + ' · Record max ' + f1(so.full && so.full.max) + ' dB(A)',
+        series: [{ x: so.t, y: so.l, label: 'LAF' }], hlines: showL ? [{ y: hiS, label: 'Limit ' + hiS + ' dB(A)' }] : [] }) });
+    }
+    var axes = [['z', raw ? S.av : S.wz, raw ? T.rawz : T.vibz, raw ? m.raw.z : { max: m.zC.max, a95: m.zC.a95, zp: m.zC.zp }, L.maxv],
+      ['x', raw ? S.h1 : S.wx, raw ? T.rawx : T.vibx, raw ? m.raw.x : m.x, L.maxh],
+      ['y', raw ? S.h2 : S.wy, raw ? T.rawy : T.viby, raw ? m.raw.y : m.y, L.maxh]];
+    axes.forEach(function (a, k) {
+      var hl = showL ? [{ y: a[4] / 2, label: '±' + (a[4] / 2) + ' mg (max p-p ' + a[4] + ')' }, { y: -a[4] / 2 }] : [];
+      list.push({ id: 'vib' + a[0], group: 'time', title: a[2], cfg: T0({ title: a[2], symmetricY: true,
+        stats: 'Max Pk/Pk ' + f1(a[3].max) + ' · A95 ' + f1(a[3].a95) + ' · 0-Pk ' + f1(a[3].zp) + ' mg' + (a[0] === 'z' && !raw ? ' (constant-accel. region)' : ''),
+        series: [{ x: tt, y: scaleArr(a[1], MG), label: a[0] === 'z' ? T.z : a[0] === 'x' ? T.x : T.y, pi: [3, 0, 1][k] }], hlines: hl }) });
+    });
+    list.push({ id: 'accel', group: 'time', title: T.accel, cfg: T0({ title: T.accel, symmetricY: true, stats: 'Max acc ' + m.aMax.toFixed(3) + ' · Max dec ' + m.dMax.toFixed(3) + ' m/s²',
+      series: [{ x: tt, y: S.afl, label: T.accel }], hlines: showL ? [{ y: L.accel, label: T.limitUp + ' ' + L.accel }, { y: -L.decel, label: T.limitDn + ' ' + L.decel }] : [] }) });
+    list.push({ id: 'jerk', group: 'time', title: T.jerk, cfg: T0({ title: T.jerk, symmetricY: true, stats: 'Max ' + m.jMax.toFixed(2) + ' m/s³',
+      series: [{ x: tt, y: S.jerk, label: T.jerk }], hlines: showL ? [{ y: L.jerk, label: T.jl + L.jerk }, { y: -L.jerk }] : [] }) });
     var sp = res.spectrum;
     if (sp.nb) {
-      var fv = [];
-      if (res.diag.rollerHz) fv.push({ x: res.diag.rollerHz, label: 'Roller ' + res.diag.rollerHz.toFixed(1) + ' Hz', color: '#d9480f' });
-      if (res.diag.sheaveHz) fv.push({ x: res.diag.sheaveHz, label: 'Sheave ' + res.diag.sheaveHz.toFixed(1) + ' Hz', color: '#7048e8' });
+      var SHORT = { sheave: 'Sheave', motor: 'Motor', drive: 'Elec.', ripple: 'Ripple', roller: 'Roller', bracket: 'Bracket', joint: 'Joint' };
+      var fv = [], cols = { sheave: '#7048e8', motor: '#ad1457', drive: '#ad1457', ripple: '#ad1457', roller: '#d9480f', bracket: '#2b8a3e', joint: '#2b8a3e' };
+      var cands = (root.LiftSource && opt.lift) ? root.LiftSource.candidates(res.diag.vSteady || m.vPeak, root.LiftSource.liftData(opt.lift)) : [];
+      cands.filter(function (c) { return c.f >= 0.5 && c.f <= m.vibHi && c.group !== 'joint'; }).forEach(function (c) { fv.push({ x: c.f, label: SHORT[c.group] + (c.harmonic > 1 ? '×' + c.harmonic : '') + ' ' + c.f.toFixed(1), color: cols[c.group] }); });
+      if (!cands.length) {
+        if (res.diag.rollerHz) fv.push({ x: res.diag.rollerHz, label: 'Roller ' + res.diag.rollerHz.toFixed(1) + ' Hz', color: '#d9480f' });
+        if (res.diag.sheaveHz) fv.push({ x: res.diag.sheaveHz, label: 'Sheave ' + res.diag.sheaveHz.toFixed(1) + ' Hz', color: '#7048e8' });
+      }
       var fr = { xmin: 0, xmax: m.vibHi };
-      list.push({ id: 'fftz', title: T.fftz, cfg: Object.assign({ title: T.fftz, xlabel: T.fftx, ylabel: T.ffty, series: [{ x: sp.nb.f, y: sp.nb.z, label: T.z }], vlines: fv, ymin: 0 }, fr) });
-      list.push({ id: 'ffth', title: T.ffth, cfg: Object.assign({ title: T.ffth, xlabel: T.fftx, ylabel: T.ffty, series: [{ x: sp.nb.f, y: sp.nb.x, label: T.x }, { x: sp.nb.f, y: sp.nb.y, label: T.y, color: '#7048e8' }], vlines: fv, ymin: 0 }, fr) });
+      list.push({ id: 'fftz', group: 'freq', title: T.fftz, cfg: Object.assign({ title: T.fftz, xlabel: T.fftx, ylabel: T.ffty, series: [{ x: sp.nb.f, y: sp.nb.z, label: T.z }], vlines: fv, ymin: 0 }, fr) });
+      list.push({ id: 'ffth', group: 'freq', title: T.ffth, cfg: Object.assign({ title: T.ffth, xlabel: T.fftx, ylabel: T.ffty, series: [{ x: sp.nb.f, y: sp.nb.x, label: T.x }, { x: sp.nb.f, y: sp.nb.y, label: T.y, color: '#7048e8' }], vlines: fv, ymin: 0 }, fr) });
     }
     var fc = sp.fc;
     var isoL = (L.comfort).toFixed(3), isoL2 = (L.comfort * 2).toFixed(3);
-    list.push({ id: 'specz', title: T.specz, cfg: { title: T.specz, xlabel: T.freq, ylabel: T.ylev, xlog: true, ylog: true, xmin: 0.5,
+    list.push({ id: 'specz', group: 'oct', title: T.specz, cfg: { title: T.specz, xlabel: T.freq, ylabel: T.ylev, xlog: true, ylog: true, xmin: 0.5,
       series: [{ x: fc, y: scaleList(sp.z, MG), label: T.meas, marker: true, width: 2 },
         { x: fc, y: scaleList(sp.isoZ1, MG), label: T.iso1 + isoL + ' m/s²', dash: true, color: '#2b8a3e' },
         { x: fc, y: scaleList(sp.isoZ2, MG), label: T.iso1 + isoL2 + ' m/s²', dash: true, color: '#d9480f' }] } });
-    list.push({ id: 'spech', title: T.spech, cfg: { title: T.spech, xlabel: T.freq, ylabel: T.ylev, xlog: true, ylog: true, xmin: 0.5,
+    list.push({ id: 'spech', group: 'oct', title: T.spech, cfg: { title: T.spech, xlabel: T.freq, ylabel: T.ylev, xlog: true, ylog: true, xmin: 0.5,
       series: [{ x: fc, y: scaleList(sp.x, MG), label: T.x, marker: true, width: 2 }, { x: fc, y: scaleList(sp.y, MG), label: T.y, marker: true, width: 2, color: '#7048e8' },
         { x: fc, y: scaleList(sp.isoH1, MG), label: T.iso1 + isoL, dash: true, color: '#2b8a3e' },
         { x: fc, y: scaleList(sp.isoH2, MG), label: T.iso1 + isoL2, dash: true, color: '#d9480f' }] } });
@@ -111,19 +135,25 @@
   }
   function yn(b) { return b ? 'Yes' : 'Not confirmed'; }
   var EN_LABELS = { accel: 'Max acceleration (m/s²)', decel: 'Max deceleration (m/s²)', jerk: 'Max jerk (m/s³)', a95z: 'A95 vertical vibration, constant region (mg p-p)',
-    a95x: 'A95 horizontal X (mg p-p)', a95y: 'A95 horizontal Y (mg p-p)', aw: 'ISO 2631-1 weighted rms, worst axis (m/s²)', rated: 'Peak speed vs rated (m/s)' };
+    a95x: 'A95 horizontal X (mg p-p)', a95y: 'A95 horizontal Y (mg p-p)', aw: 'ISO 2631-1 weighted rms, worst axis (m/s²)', rated: 'Peak speed vs rated (m/s)',
+    maxz: 'Max vertical vibration ISO (mg p-p)', maxx: 'Max horizontal X ISO (mg p-p)', maxy: 'Max horizontal Y ISO (mg p-p)', sound: 'Max sound level, run (dB(A))' };
+  function fx(v, d) { return (v === null || v === undefined || !isFinite(v)) ? '-' : v.toFixed(d); }
+  function limTxt(v) { return v.band ? v.lo + '-' + v.hi + ' % of ' + v.limit : String(v.limit); }
+  function pctTxt(v) { return v.db ? (v.margin >= 0 ? '+' : '') + v.margin.toFixed(1) + ' dB' : v.pct === null ? '-' : v.pct.toFixed(1) + ' %'; }
 
-  function render(res, meta, L, cov) {
-    meta = meta || {}; cov = cov || { up: 0, down: 0 };
+  // extra: {limitSet: 'reference'|'manual', lift, source (LiftSource.analyzeRun result)}
+  function render(res, meta, L, cov, extra) {
+    meta = meta || {}; cov = cov || { up: 0, down: 0 }; extra = extra || {};
     var m = res.m, pages = [], p, x, y, dp = m.noiseFloorZ >= 3 ? 0 : 1;
-    var charts = chartConfigs(res, L), byId = {}; charts.forEach(function (c) { byId[c.id] = c; });
+    var charts = chartConfigs(res, L, { lift: extra.lift }), byId = {}; charts.forEach(function (c) { byId[c.id] = c; });
     var ascii = function (s) { return String(s || '').replace(/[^\x20-\x7E→]/g, '').trim(); };
+    var so = res.sound, setName = extra.limitSet === 'manual' ? 'Manual limits (set by the user)' : 'Reference limits (default)';
 
-    /* ---- page 1: general information, results ---- */
+    /* ---- page 1: general information, measurements ---- */
     p = mkPage(); x = p.x;
     x.fillStyle = '#0b3d6e'; x.fillRect(0, 0, PW, 160);
     txt(x, 'Lift Ride Quality Report', MARGIN, 80, { size: 54, bold: true, color: '#fff' });
-    txt(x, 'Smartphone measurement · method of ISO 18738:2003 · peak-to-peak vibration, performance parameters', MARGIN, 122, { size: 23, color: '#cfe0f3' });
+    txt(x, 'Lift Ride Test · method of ISO 18738 · vibration, performance, sound', MARGIN, 122, { size: 23, color: '#cfe0f3' });
     y = 210;
     if (meta.demo) { x.fillStyle = '#fff3dc'; x.fillRect(MARGIN, y - 34, CW, 46); txt(x, 'DEMO — simulated data, not a real measurement', MARGIN + 14, y - 3, { size: 24, bold: true, color: '#a65f00' }); y += 44; }
     y = heading(x, 'General information', y + 6) + 24;
@@ -133,7 +163,6 @@
       ['Measured by', ascii(meta.operator) || '-', 'Organisation', ascii(meta.org) || '-'],
       ['Instrument', ascii(meta.instr) || '-', 'Last sensor check', ascii(meta.lastCheck) || '-'],
       ['Persons in car', String(meta.persons === undefined ? '-' : meta.persons), 'Car fan / AC off', yn(meta.fan)],
-      ['Alarms / chimes off', yn(meta.chime), 'Phone placement OK', yn(meta.placed)],
       ['Method', res.method === 'fusion' ? 'Baro + accelerometer' : 'Accelerometer only', 'Sampling', res.fs + ' Hz'],
       ['Notes', ascii(meta.note) || '-', 'Runs for this lift', 'UP ' + cov.up + ' / DOWN ' + cov.down]
     ];
@@ -143,66 +172,99 @@
       txt(x, r[2], MARGIN + 570, y, { size: 20, color: '#55677a' }); txt(x, fit(x, r[3], 300, 21, true), MARGIN + 800, y, { size: 21, bold: true });
       y += 40;
     });
-    y += 34;
-    y = heading(x, 'Ride quality results — weighted vibration, peak-to-peak (mg)', y) + 14;
-    y = drawTable(x, y, ['Axis / region', 'Maximum p-p', 'A95 p-p', '0-peak'], [{ w: 520 }, { w: 200, align: 'right' }, { w: 200, align: 'right' }, { w: 180, align: 'right' }], [
-      ['X, front-back (between boundaries 1 and 2)', m.x.max.toFixed(dp), m.x.a95.toFixed(dp), m.x.zp.toFixed(dp)],
-      ['Y, side-to-side (between boundaries 1 and 2)', m.y.max.toFixed(dp), m.y.a95.toFixed(dp), m.y.zp.toFixed(dp)],
-      ['Z vertical, constant-acceleration region', m.zC.max.toFixed(dp), m.zC.a95.toFixed(dp), m.zC.zp.toFixed(dp)],
-      ['Z vertical, non-constant region', m.zN.max.toFixed(dp), '-', m.zN.zp.toFixed(dp)]
-    ]);
-    y += 10;
-    y = heading(x, 'Performance characteristics (for reference)', y) + 14;
-    y = drawTable(x, y, ['Quantity', 'Maximum', 'A95 / V95'], [{ w: 520 }, { w: 280, align: 'right' }, { w: 300, align: 'right' }], [
-      ['Speed (m/s)', m.vPeak.toFixed(2), m.v95.toFixed(2)],
-      ['Acceleration (m/s²)', m.aMax.toFixed(2), m.aA95.toFixed(2)],
-      ['Deceleration (m/s²)', m.dMax.toFixed(2), m.dA95.toFixed(2)],
-      ['Jerk (m/s³)', m.jMax.toFixed(1), '-'],
-      ['Travel height (m) / ride time (s)', m.height.toFixed(2), m.rideTime.toFixed(1)]
-    ]);
-    var scoreNote = 'Sound level (LAeq, max dB(A)) was not measured. Boundary 1 / 2 = 500 mm after the start / before the stop. Values are rounded to the precision the phone sensor supports (noise floor ' + m.noiseFloorZ.toFixed(1) + ' mg vertical).';
-    y = wrap(x, scoreNote, MARGIN, y, CW, 28, { size: 20, color: '#55677a' });
+    y += 26;
+    var c4 = [{ w: 380 }, { w: 180, align: 'right' }, { w: 180, align: 'right' }, { w: 180, align: 'right' }, { w: 180, align: 'right' }];
+    if (so) {
+      y = heading(x, 'Sound level dB(A)' + (so.demo ? ' — DEMO' : so.calibrated ? '' : ' — uncalibrated, indicative'), y) + 14;
+      y = drawTable(x, y, ['', 'Full run', 'Pre-run', 'Post-run', 'Full record'], c4, [
+        ['Max (LAF, 125 ms)', fx(so.run && so.run.max, 1), fx(so.pre && so.pre.max, 1), fx(so.post && so.post.max, 1), fx(so.full && so.full.max, 1)],
+        ['LAeq', fx(so.run && so.run.leq, 1), fx(so.pre && so.pre.leq, 1), fx(so.post && so.post.leq, 1), fx(so.full && so.full.leq, 1)]
+      ], { rowH: 38, size: 20 });
+    }
+    var c3 = [{ w: 470 }, { w: 210, align: 'right' }, { w: 210, align: 'right' }, { w: 210, align: 'right' }];
+    y += 22;
+    y = heading(x, 'Raw data, unfiltered (mg) — between boundaries 1 and 2', y) + 14;
+    y = drawTable(x, y, ['', 'X', 'Y', 'Z'], c3, [
+      ['Max Pk to Pk', fx(m.raw.x.max, dp), fx(m.raw.y.max, dp), fx(m.raw.z.max, dp)],
+      ['A95', fx(m.raw.x.a95, dp), fx(m.raw.y.a95, dp), fx(m.raw.z.a95, dp)],
+      ['Max 0 to Pk', fx(m.raw.x.zp, dp), fx(m.raw.y.zp, dp), fx(m.raw.z.zp, dp)]
+    ], { rowH: 38, size: 20 });
+    y += 22;
+    y = heading(x, 'ISO-weighted vibration (mg) — ISO 18738 regions', y) + 14;
+    y = drawTable(x, y, ['', 'X (B1-B2)', 'Y (B1-B2)', 'Z (const. acc.)'], c3, [
+      ['Max Pk to Pk', fx(m.x.max, dp), fx(m.y.max, dp), fx(m.zC.max, dp)],
+      ['A95', fx(m.x.a95, dp), fx(m.y.a95, dp), fx(m.zC.a95, dp)],
+      ['Max 0 to Pk', fx(m.x.zp, dp), fx(m.y.zp, dp), fx(m.zC.zp, dp)]
+    ], { rowH: 38, size: 20 });
+    y += 22;
+    y = heading(x, 'Performance', y) + 14;
+    y = drawTable(x, y, ['', 'Max', '95', 'Average'], c3, [
+      ['Velocity (m/s)', m.vPeak.toFixed(2), m.v95.toFixed(2), '-'],
+      ['Jerk (m/s³)', m.jMax.toFixed(2), m.jP95.toFixed(2), '-'],
+      ['Acceleration (m/s²)', m.aMax.toFixed(3), m.aA95.toFixed(3), m.aAvg.toFixed(3)],
+      ['Deceleration (m/s²)', m.dMax.toFixed(3), m.dA95.toFixed(3), m.dAvg.toFixed(3)],
+      ['Distance travelled (m) / ride time (s)', m.height.toFixed(2), m.rideTime.toFixed(1) + ' s', '-']
+    ], { rowH: 38, size: 20 });
     pages.push(p);
 
-    /* ---- page 2: limits, notes, speed/height ---- */
+    /* ---- page 2: analysis against limits ---- */
     p = mkPage(); x = p.x; y = 70;
-    y = heading(x, 'Results against reference limits', y) + 14;
-    y = drawTable(x, y, ['Parameter', 'Measured', 'Limit', 'Status'], [{ w: 520 }, { w: 190, align: 'right' }, { w: 190, align: 'right' }, { w: 200, align: 'right' }],
+    y = heading(x, 'Analysis — ' + setName, y) + 14;
+    y = drawTable(x, y, ['Parameter', 'Measured', 'Limit', '% Limit', 'Status'], [{ w: 450 }, { w: 160, align: 'right' }, { w: 190, align: 'right' }, { w: 150, align: 'right' }, { w: 150, align: 'right' }],
       res.verdicts.map(function (v) {
-        return [EN_LABELS[v.key] || v.label, v.value.toFixed(v.dp), (v.band ? '±5% of ' : '<= ') + v.limit, { t: v.ok ? 'Within' : (v.band ? 'Outside' : 'Exceeds'), color: v.ok ? '#17803f' : '#c4302b', bold: true }];
+        return [fit(x, EN_LABELS[v.key] || v.label, 430, 20), v.value.toFixed(v.dp), limTxt(v), pctTxt(v), { t: v.ok ? 'PASS' : 'FAIL', color: v.ok ? '#17803f' : '#c4302b', bold: true }];
       }), { rowH: 40, size: 20 });
-    txt(x, 'ISO 18738 does not define acceptable values; limits are editable reference values.', MARGIN, y - 6, { size: 19, color: '#55677a' }); y += 26;
+    y = wrap(x, 'ISO 18738 defines the measuring method only, not acceptable values. ' + (extra.limitSet === 'manual' ? 'The limits above were entered by the user.' : 'Reference limits: speed 92-105 % of rated and acceleration 1.5 m/s² as in GB/T 10058; other values are common screening values. Confirm against the contract.'), MARGIN, y, CW, 27, { size: 19, color: '#55677a' });
+    y += 10;
     if (res.warnings.length) {
       txt(x, 'Notes from the analysis', MARGIN, y, { size: 24, bold: true, color: '#a65f00' }); y += 32;
       res.warnings.slice(0, 5).forEach(function (w) { y = wrap(x, '• ' + w, MARGIN, y, CW, 27, { size: 20, color: '#a65f00' }); });
       y += 8;
     }
-    y = chartInto(p, byId.speed, y, 330); y = chartInto(p, byId.height, y, 330); y = chartInto(p, byId.accel, y, 330);
-    pages.push(p);
-
-    /* ---- page 3: jerk and vibration ---- */
-    p = mkPage(); y = 60;
-    y = chartInto(p, byId.jerk, y, 360); y = chartInto(p, byId.vibz, y, 360); y = chartInto(p, byId.vibh, y, 360);
-    if (byId.fftz) y = chartInto(p, byId.fftz, y, 360);
-    pages.push(p);
-
-    /* ---- page 4: spectra, bumps, method ---- */
-    p = mkPage(); x = p.x; y = 60;
-    if (byId.ffth) y = chartInto(p, byId.ffth, y, 340);
-    y = chartInto(p, byId.specz, y, 380);
-    if (res.bumps.length) {
-      y = heading(x, 'Largest vertical vibration events (constant-acceleration region)', y + 14) + 12;
-      y = drawTable(x, y, ['#', 'Time (s)', 'Position from start (m)', 'p-p (mg)'], [{ w: 120 }, { w: 280, align: 'right' }, { w: 400, align: 'right' }, { w: 300, align: 'right' }],
-        res.bumps.slice(0, 4).map(function (b, i) { return [String(i + 1), b.t.toFixed(1), b.pos.toFixed(1), b.mg.toFixed(dp)]; }), { rowH: 36, size: 20, plain: true });
+    if (extra.source) {
+      y = heading(x, 'Vibration source analysis (probable causes, verify on site)', y + 10) + 18;
+      extra.source.findings.slice(0, 6).forEach(function (f) {
+        if (y > PH - 220) return;
+        var col = f.level === 'high' ? '#c4302b' : f.level === 'medium' ? '#a65f00' : f.level === 'ok' ? '#17803f' : '#55677a';
+        txt(x, '[' + f.level.toUpperCase() + '] ' + f.title, MARGIN, y, { size: 22, bold: true, color: col }); y += 30;
+        f.evidence.slice(0, 2).forEach(function (e) { y = wrap(x, '– ' + e, MARGIN + 20, y, CW - 20, 26, { size: 19, color: '#33414f' }); });
+        if (f.check.length) y = wrap(x, 'Check: ' + f.check.slice(0, 4).join('; ') + '.', MARGIN + 20, y, CW - 20, 26, { size: 19, color: '#0b3d6e' });
+        y += 8;
+      });
     }
-    y += 8; txt(x, 'Method and limitations', MARGIN, y, { size: 26, bold: true, color: '#0b3d6e' }); y += 32;
+    pages.push(p);
+
+    /* ---- page 3: curves, PMT-style stack (sound, X, Y, Z, speed) ---- */
+    p = mkPage(); y = 50;
+    var stack = ['sound', 'vibx', 'viby', 'vibz', 'speed'].filter(function (k) { return byId[k]; }), hh = Math.floor((PH - 170) / stack.length) - 14;
+    stack.forEach(function (k) { y = chartInto(p, byId[k], y, hh); });
+    pages.push(p);
+
+    /* ---- page 4: height, acceleration, jerk ---- */
+    p = mkPage(); y = 60;
+    y = chartInto(p, byId.height, y, 470); y = chartInto(p, byId.accel, y, 470); y = chartInto(p, byId.jerk, y, 470);
+    pages.push(p);
+
+    /* ---- page 5: spectra, events, method ---- */
+    p = mkPage(); x = p.x; y = 60;
+    if (byId.fftz) y = chartInto(p, byId.fftz, y, 330);
+    if (byId.ffth) y = chartInto(p, byId.ffth, y, 330);
+    y = chartInto(p, byId.specz, y, 360);
+    var evs = extra.source ? extra.source.events.slice(0, 6) : [];
+    if (evs.length) {
+      y = heading(x, 'Largest vibration events and their position', y + 10) + 12;
+      y = drawTable(x, y, ['Axis', 'Time (s)', 'Height* (m)', 'Speed (m/s)', 'p-p (mg)'], [{ w: 160 }, { w: 220, align: 'right' }, { w: 260, align: 'right' }, { w: 240, align: 'right' }, { w: 220, align: 'right' }],
+        evs.map(function (e) { return [e.axis.toUpperCase(), e.t.toFixed(1), e.posAbs.toFixed(1), e.v.toFixed(2), e.mg.toFixed(dp)]; }), { rowH: 34, size: 19, plain: true });
+      txt(x, '*Height above the lowest point of this run, from the integrated travel (about ±0.5 m).', MARGIN, y - 8, { size: 18, color: '#55677a' }); y += 22;
+    }
+    y += 6; txt(x, 'Method and limitations', MARGIN, y, { size: 26, bold: true, color: '#0b3d6e' }); y += 32;
     var notes = [
-      'Axes: z = vertical (from gravity during the first still seconds), x and y = horizontal. Vibration is weighted with ISO 2631-1 Wk (z) and Wd (x, y) in the time domain; peak-to-peak levels use the zero-crossing method (ISO 18738 Annex A).',
-      'Acceleration and jerk: 10 Hz 2-pole Butterworth magnitude (zero phase), jerk from a 0.5 s running least-squares slope. Constant / non-constant regions: Annex B (1 Hz filtered acceleration, slope 0.3 m/s3 over 1 s, +/-0.5 s).',
-      'Speed and height: ' + (res.method === 'fusion' ? 'barometer and accelerometer fusion (tau ' + res.opts.tau + ' s)' : 'double integration of the bias-corrected vertical acceleration with zero-velocity end correction') + (m.scale !== 1 ? '; scaled to the entered height (factor ' + m.scale.toFixed(3) + ')' : '') + '.',
-      'A phone MEMS sensor is not a calibrated instrument. Noise floor: vertical ' + m.noiseFloorZ.toFixed(1) + ' mg, horizontal ' + m.noiseFloorH.toFixed(1) + ' mg (weighted p-p, A95). Use for screening, comparison and troubleshooting, not as certified ride-quality evidence.'
+      'Axes: z = vertical (from gravity during the first still seconds), x and y = horizontal. Weighting ISO 2631-1 Wk (z) and Wd (x, y); peak-to-peak by the zero-crossing method (ISO 18738 Annex A). Unfiltered = gravity removed, no weighting.',
+      'Acceleration and jerk: 10 Hz 2-pole low-pass, jerk from a 0.5 s running least-squares slope. Speed and height: ' + (res.method === 'fusion' ? 'barometer and accelerometer fusion' : 'integration of the vertical acceleration with zero-velocity correction') + (m.scale !== 1 ? ', scaled to the entered height' : '') + '.',
+      'Sound: A-weighted 125 ms block levels from the device microphone' + (so ? (so.demo ? ' (DEMO data)' : so.calibrated ? ', calibrated with an offset of ' + so.offset.toFixed(1) + ' dB' : ', not calibrated') : ' (not recorded)') + '. A phone is not a class 1/2 sound level meter.',
+      'A phone MEMS sensor is not a calibrated instrument. Noise floor: vertical ' + m.noiseFloorZ.toFixed(1) + ' mg, horizontal ' + m.noiseFloorH.toFixed(1) + ' mg. Use for screening, comparison and troubleshooting.'
     ];
-    notes.forEach(function (n) { y = wrap(x, '• ' + n, MARGIN, y, CW, 27, { size: 19, color: '#33414f' }); y += 4; });
+    notes.forEach(function (n) { if (y < PH - 140) { y = wrap(x, '• ' + n, MARGIN, y, CW, 26, { size: 18, color: '#33414f' }); y += 4; } });
     pages.push(p);
 
     pages.forEach(function (pg, i) { footer(pg, i + 1, pages.length); });
