@@ -1,0 +1,50 @@
+# Lift Ride Test — PC / web version (installable PWA) on GitHub Pages.
+# One-time setup: repo Settings > Pages > Build and deployment > Source = "GitHub Actions".
+# Note: GitHub Free plan serves Pages only from PUBLIC repositories. The code holds no passwords or data
+# (cloud URL is public-safe; every call still needs a login). If you keep the repo private, use Netlify Drop instead (see README).
+name: Deploy web app (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths: ['www/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 1. Get the code
+        uses: actions/checkout@v4
+
+      - name: 2. Check the web files exist
+        run: |
+          set -euo pipefail
+          for f in www/index.html www/manifest.webmanifest www/sw.js www/config.js www/js/app.js www/icons/icon-192.png; do
+            if [ ! -f "$f" ]; then echo "::error::Missing file: $f (was it uploaded? hidden folders and sub-folders must be included)"; exit 1; fi
+          done
+          echo "Web files present."
+
+      - name: 3. Set up Pages
+        uses: actions/configure-pages@v5
+
+      - name: 4. Upload the www folder
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: www
+
+      - name: 5. Publish
+        id: deployment
+        uses: actions/deploy-pages@v4
