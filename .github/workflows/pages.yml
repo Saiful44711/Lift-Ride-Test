@@ -35,6 +35,15 @@ jobs:
           done
           echo "Web files present."
 
+      - name: 2b. Version information for "Update available"
+        run: |
+          set -euo pipefail
+          VER="$(node -p "require('./package.json').version")"
+          SHA="${GITHUB_SHA:0:12}"
+          printf '/* written by the Pages deploy */\nwindow.LRM_BUILD = { version: "%s", build: %s, sha: "%s", kind: "web" };\n' "$VER" "${{ github.run_number }}" "$SHA" > www/build-info.js
+          printf '{"version":"%s","build":%s,"sha":"%s"}\n' "$VER" "${{ github.run_number }}" "$SHA" > www/version.json
+          cat www/build-info.js www/version.json
+
       - name: 3. Set up Pages
         uses: actions/configure-pages@v5
 
