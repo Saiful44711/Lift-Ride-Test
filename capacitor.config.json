@@ -1,0 +1,6 @@
+{
+  "appId": "com.saiful.liftridemeter",
+  "appName": "Lift Ride Test",
+  "webDir": "www",
+  "server": { "androidScheme": "https" }
+}

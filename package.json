@@ -1,0 +1,20 @@
+{
+  "name": "lift-ride-meter",
+  "version": "2.1.1",
+  "private": true,
+  "description": "Lift Ride Test — ফোনের sensor দিয়ে লিফটের speed, height, vibration, jerk মাপা (Design & Developed by Md. Saiful Islam)",
+  "scripts": {
+    "test": "node tests/core.test.js",
+    "sync": "cap sync android"
+  },
+  "engines": { "node": "22.x" },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/share": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}
