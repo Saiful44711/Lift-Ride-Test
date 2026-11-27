@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: 1. কোড নামানো
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: 2. প্রয়োজনীয় ফাইল আছে কি না যাচাই
         run: |
@@ -53,12 +53,13 @@ jobs:
           echo "সব ফাইল আছে ✓"
 
       - name: 3. Node সেটআপ (package.json engines থেকে)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: package.json
+          package-manager-cache: false
 
       - name: 4. Java সেটআপ (.java-version থেকে)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version-file: .java-version
@@ -143,7 +144,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 12. Debug APK আপলোড
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: LiftRideTest-debug-apk
           path: dist/LiftRideTest-debug.apk
@@ -173,7 +174,7 @@ jobs:
 
       - name: 14. (ঐচ্ছিক) Release APK আপলোড
         if: ${{ env.KEYSTORE_BASE64 != '' && hashFiles('dist/LiftRideTest-release.apk') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: LiftRideTest-release-apk
           path: dist/LiftRideTest-release.apk
@@ -203,7 +204,7 @@ jobs:
 
       - name: 15. ব্যর্থ হলে লগ সংরক্ষণ
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gradle-debug-log
           path: |
