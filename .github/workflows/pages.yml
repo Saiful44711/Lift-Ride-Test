@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 1. Get the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: 2. Check the web files exist
         run: |
@@ -45,10 +45,10 @@ jobs:
           cat www/build-info.js www/version.json
 
       - name: 3. Set up Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: 4. Upload the www folder
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: www
 
@@ -61,4 +61,4 @@ jobs:
     steps:
       - name: 5. Publish
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
