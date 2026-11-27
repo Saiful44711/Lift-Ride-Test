@@ -48,11 +48,31 @@
     var axes = [['z', raw ? S.av : S.wz, raw ? T.rawz : T.vibz, raw ? m.raw.z : { max: m.zC.max, a95: m.zC.a95, zp: m.zC.zp }, L.maxv],
       ['x', raw ? S.h1 : S.wx, raw ? T.rawx : T.vibx, raw ? m.raw.x : m.x, L.maxh],
       ['y', raw ? S.h2 : S.wy, raw ? T.rawy : T.viby, raw ? m.raw.y : m.y, L.maxh]];
+    // v2.2.1: unfiltered = the raw signal (as PMT EVA shows first); ISO filter = weighted, with the limit lines,
+    // the jerk zone drawn in its own colour and + / o markers on the max peak-to-peak (PMT style).
+    function segPts(sig, seg, shape, color) {
+      if (!seg) return [];
+      var kmx = seg.s, kmn = seg.s; for (var q = seg.s; q <= seg.e; q++) { if (sig[q] > sig[kmx]) kmx = q; if (sig[q] < sig[kmn]) kmn = q; }
+      return [{ x: tt[kmx], y: sig[kmx] * MG, shape: shape, color: color }, { x: tt[kmn], y: sig[kmn] * MG, shape: shape, color: color }];
+    }
+    var mk = m.mk || {}, JZ = '#0c8599';
     axes.forEach(function (a, k) {
-      var hl = showL ? [{ y: a[4] / 2, label: '±' + (a[4] / 2) + ' mg (max p-p ' + a[4] + ')' }, { y: -a[4] / 2 }] : [];
-      list.push({ id: 'vib' + a[0], group: 'time', title: a[2], cfg: T0({ title: a[2], symmetricY: true,
-        stats: 'Max Pk/Pk ' + f1(a[3].max) + ' · A95 ' + f1(a[3].a95) + ' · 0-Pk ' + f1(a[3].zp) + ' mg' + (a[0] === 'z' && !raw ? ' (constant-accel. region)' : ''),
-        series: [{ x: tt, y: scaleArr(a[1], MG), label: a[0] === 'z' ? T.z : a[0] === 'x' ? T.x : T.y, pi: [3, 0, 1][k] }], hlines: hl }) });
+      var iso = !raw, hl = (showL && iso) ? [{ y: a[4] / 2, label: '±' + (a[4] / 2) + ' mg (max p-p ' + a[4] + ')' }, { y: -a[4] / 2 }] : [];
+      var lab = a[0] === 'z' ? T.z : a[0] === 'x' ? T.x : T.y, series, pts = [], st;
+      if (iso && a[0] === 'z' && S.nonc) {
+        var yc = new Float64Array(tt.length), yj = new Float64Array(tt.length);
+        for (var q = 0; q < tt.length; q++) { var val = a[1][q] * MG, jz = S.nonc[q] === 1; yc[q] = jz ? NaN : val; yj[q] = jz ? val : NaN; }
+        // join the two colours without a gap
+        for (q = 1; q < tt.length; q++) { var j0 = S.nonc[q - 1] === 1, j1 = S.nonc[q] === 1; if (j0 && !j1) yj[q] = yc[q]; if (!j0 && j1) yc[q] = yj[q]; }
+        series = [{ x: tt, y: yc, label: T.z, pi: 3 }, { x: tt, y: yj, label: 'Jerk zone', color: JZ }];
+        pts = segPts(a[1], mk.zC, 'plus').concat(segPts(a[1], mk.zN, 'circle', JZ));
+        st = 'Max Pk/Pk ' + f1(m.zC.max) + ' · A95 ' + f1(m.zC.a95) + ' · 0-Pk ' + f1(m.zpZall !== undefined ? m.zpZall : m.zC.zp) + ' mg · Jerk zone Max Pk/Pk ' + f1(m.zN.max);
+      } else {
+        series = [{ x: tt, y: scaleArr(a[1], MG), label: lab, pi: [3, 0, 1][k] }];
+        if (iso) pts = segPts(a[1], mk[a[0]], 'plus');
+        st = 'Max Pk/Pk ' + f1(a[3].max) + ' · A95 ' + f1(a[3].a95) + ' · 0-Pk ' + f1(a[3].zp) + ' mg';
+      }
+      list.push({ id: 'vib' + a[0], group: 'time', title: a[2], cfg: T0({ title: a[2], symmetricY: true, stats: st, series: series, hlines: hl, points: pts }) });
     });
     list.push({ id: 'accel', group: 'time', title: T.accel, cfg: T0({ title: T.accel, symmetricY: true, stats: 'Max acc ' + m.aMax.toFixed(3) + ' · Max dec ' + m.dMax.toFixed(3) + ' m/s²',
       series: [{ x: tt, y: S.afl, label: T.accel }], hlines: showL ? [{ y: L.accel, label: T.limitUp + ' ' + L.accel }, { y: -L.decel, label: T.limitDn + ' ' + L.decel }] : [] }) });

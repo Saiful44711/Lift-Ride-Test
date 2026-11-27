@@ -163,3 +163,47 @@ input:disabled { opacity: .7; }
 }
 @media (min-width: 1200px) { .app { max-width: 1560px; } .charts .chart { height: 400px; } .charts.stacked .chart { height: 440px; } }
 @media (min-width: 1700px) { .app { max-width: 1840px; } .charts .chart { height: 440px; } .charts.stacked .chart { height: 480px; } }
+
+/* ---- v2.2.1: refreshed look, help text under every option, aligned tables ---- */
+.top { background: linear-gradient(90deg, #0b4a7d, #0b63c4); color: #fff; border-bottom: 0; }
+.top .brand small { color: rgba(255,255,255,.8); }
+.top .logo { color: #fff; }
+.top .icon-btn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); color: #fff; }
+.card { box-shadow: 0 1px 2px rgba(16,32,48,.06), 0 4px 14px rgba(16,32,48,.04); }
+.card > h2, .card > .row > h2, .card > .row.between > h2 { position: relative; padding-left: 12px; }
+.card > h2::before, .card > .row > h2::before { content: ""; position: absolute; left: 0; top: .2em; bottom: .2em; width: 4px; border-radius: 4px; background: var(--primary); }
+.charts .card > h2::before { display: none; } .charts .card > h2 { padding-left: 0; }
+label { font-weight: 600; color: var(--fg); font-size: .84rem; }
+input[type=text], input[type=number], input[type=password], input[type=search], input[type=email], select { font-weight: 400; }
+input[type=email] { width: 100%; min-height: 44px; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--input); color: var(--fg); font: inherit; }
+.hint { display: block; margin-top: 4px; font-size: .76rem; font-weight: 400; line-height: 1.35; color: var(--muted); }
+.hint.chk { margin: -8px 0 8px 30px; }
+.hint-list { list-style: none; margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid color-mix(in srgb, var(--primary) 45%, transparent); background: color-mix(in srgb, var(--primary) 6%, transparent); border-radius: 0 10px 10px 0; font-size: .78rem; color: var(--muted); }
+.hint-list li { margin: 3px 0; line-height: 1.4; } .hint-list b { color: var(--fg); }
+details.inner > summary { font-weight: 700; }
+.iso-btn { border: 2px solid #0c8599; color: #0c8599; background: transparent; }
+.iso-btn.active { background: #0c8599; color: #fff; }
+:root[data-theme="dark"] .iso-btn:not(.active) { color: #3bc9db; border-color: #3bc9db; }
+.mode-note { margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--bg); font-size: .8rem; color: var(--fg); }
+/* tables: headers aligned with their values */
+th { font-size: .8rem; color: var(--muted); font-weight: 700; text-transform: none; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+th.ctr, td.ctr { text-align: center; }
+tbody tr:hover td, tr:hover > td { background: color-mix(in srgb, var(--primary) 4%, transparent); }
+#verdictTbl { table-layout: auto; }
+#verdictTbl td:first-child, #verdictTbl th:first-child { width: 46%; }
+#verdictTbl th.num, #verdictTbl td.num { width: 15%; }
+#verdictTbl td.ctr, #verdictTbl th.ctr { width: 12%; }
+/* wide screens: settings and measure cards in two columns */
+@media (min-width: 1100px) {
+  #screen-measure.active, #screen-more.active { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; align-items: start; }
+  #screen-measure .card, #screen-more .card { margin-bottom: 14px; }
+  #screen-more #guide, #screen-more #limitsCard { grid-column: 1 / -1; }
+  #limGrid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1100px) {
+  #screen-measure.active { grid-template-columns: 1fr 1.25fr; }
+  #screen-measure #sensorCard { grid-column: 1; grid-row: 1; }
+  #screen-measure #recCard { grid-column: 1; grid-row: 2; }
+  #screen-measure #setupCard { grid-column: 2; grid-row: 1 / span 3; }
+}

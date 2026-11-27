@@ -166,5 +166,21 @@ run('known height scales', { seed: 12, baro: false }, { knownHeight: 36 }, { h: 
   }
 }
 
+/* 14) v2.2.1: ISO axes. Top edge towards the door -> phone long edge = X (front-back) */
+{
+  const mk = () => { const r = C.simulateRun({ seed: 5, rate: 200, vibH: [], noise: 0.005 }); for (let i = 0; i < r.t.length; i++) { const t = r.t[i] - r.t[0]; if (t > 8 && t < 14) r.ay[i] += 0.15 * Math.sin(2 * Math.PI * 6 * t); } return r; };
+  const d = C.analyze(mk(), {}).m, sd = C.analyze(mk(), { orient: 'side' }).m;
+  check('orient door: phone long-edge vibration is X (front-back)', d.x.max > 3 * d.y.max, `X ${d.x.max.toFixed(1)} Y ${d.y.max.toFixed(1)} mg`);
+  check('orient side: phone long-edge vibration is Y (side-side)', sd.y.max > 3 * sd.x.max, `X ${sd.x.max.toFixed(1)} Y ${sd.y.max.toFixed(1)} mg`);
+}
+/* 15) v2.2.1: brake-lift jolt just before the car moves is in the jerk zone (as PMT EVA) */
+{
+  const mk = (j) => { const r = C.simulateRun({ seed: 9, rate: 200, still0: 4, noise: 0.005, vibZ: [] }); if (j) for (let i = 0; i < r.t.length; i++) { const t = r.t[i] - r.t[0]; if (t > 3.45 && t < 3.55) r.az[i] += 0.25 * Math.sin(2 * Math.PI * 10 * (t - 3.45)); } return r; };
+  const a = C.analyze(mk(false), {}), b = C.analyze(mk(true), {});
+  check('start jolt 0.5 s before motion counted in jerk zone', b.m.zN.max > a.m.zN.max + 20, `without ${a.m.zN.max.toFixed(1)} with ${b.m.zN.max.toFixed(1)} mg`);
+  check('start jolt not in constant region', Math.abs(b.m.zC.max - a.m.zC.max) < 2, `${a.m.zC.max.toFixed(1)} vs ${b.m.zC.max.toFixed(1)}`);
+  check('marker positions reported', !!(b.m.mk && b.m.mk.zN && b.m.mk.zC && b.m.mk.zN.s > 0));
+}
+
 console.log(fails ? `\n${fails} test(s) FAILED` : '\nAll tests passed');
 process.exit(fails ? 1 : 0);

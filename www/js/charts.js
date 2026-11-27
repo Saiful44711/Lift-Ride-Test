@@ -35,7 +35,16 @@
     ctx.font = F + 'px ' + fam; ctx.textBaseline = 'middle';
 
     var L = F * 4.6, R = F * 1.0, T = cfg.title ? F * 2.6 : F * 1.2, B = F * 3.2;
-    if (cfg.stats) T += F * 1.3;
+    // v2.2.1: stats wrap onto a second line on narrow charts
+    var statLines = [];
+    if (cfg.stats) {
+      ctx.font = (F * 0.95) + 'px ' + fam;
+      var parts = String(cfg.stats).split(' · '), line = '', maxS = W - L - R;
+      parts.forEach(function (pt) { var t2 = line ? line + ' · ' + pt : pt; if (line && ctx.measureText(t2).width > maxS) { statLines.push(line); line = pt; } else line = t2; });
+      if (line) statLines.push(line);
+      ctx.font = F + 'px ' + fam;
+      T += F * 1.3 * statLines.length;
+    }
     // legend wraps onto several rows on narrow screens
     var legend = [], legRows = 0;
     if (cfg.legendRow !== false && cfg.series.length > 1) {
@@ -124,7 +133,7 @@
     // title, axis labels
     ctx.fillStyle = C.fg; ctx.textAlign = 'left';
     if (cfg.title) { ctx.font = 'bold ' + (F * 1.1) + 'px ' + fam; ctx.fillText(cfg.title, L, F * 1.3); ctx.font = F + 'px ' + fam; }
-    if (cfg.stats) { ctx.fillStyle = C.axis; ctx.font = (F * 0.95) + 'px ' + fam; ctx.fillText(cfg.stats, L, F * (cfg.title ? 2.75 : 1.3)); ctx.font = F + 'px ' + fam; }
+    if (statLines.length) { ctx.fillStyle = C.axis; ctx.font = (F * 0.95) + 'px ' + fam; statLines.forEach(function (ln, k) { ctx.fillText(ln, L, F * (cfg.title ? 2.75 : 1.3) + k * F * 1.3); }); ctx.font = F + 'px ' + fam; }
     ctx.fillStyle = C.axis; ctx.textAlign = 'center';
     if (cfg.xlabel) ctx.fillText(cfg.xlabel, L + pw / 2, H - F * 0.9);
     if (cfg.ylabel) { ctx.save(); ctx.translate(F * 0.9, T + ph / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(cfg.ylabel, 0, 0); ctx.restore(); }
@@ -165,6 +174,15 @@
       if (se.marker) {
         for (k = k0; k < k1; k++) { var ym = se.y[k]; if (ym === null || !isFinite(ym) || (cfg.ylog && ym <= 0)) continue; ctx.beginPath(); ctx.arc(fx(se.x[k]), fy(ym), Math.max(2.5, F * 0.28), 0, 6.2832); ctx.fill(); }
       }
+    });
+    // v2.2.1 point markers (PMT style): '+' = max peak-to-peak, 'o' = jerk-zone max
+    (cfg.points || []).forEach(function (pt) {
+      if (!isFinite(pt.x) || !isFinite(pt.y) || pt.x < xmin || pt.x > xmax) return;
+      var px = fx(pt.x), py = fy(Math.max(ymin, Math.min(ymax, pt.y))), r = Math.max(6, F * 0.6);
+      ctx.strokeStyle = pt.color || C.fg; ctx.lineWidth = 1.6; ctx.setLineDash([]); ctx.beginPath();
+      if (pt.shape === 'circle') ctx.arc(px, py, r, 0, 6.2832);
+      else { ctx.moveTo(px - r, py); ctx.lineTo(px + r, py); ctx.moveTo(px, py - r); ctx.lineTo(px, py + r); }
+      ctx.stroke();
     });
     ctx.restore();
 

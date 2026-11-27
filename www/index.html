@@ -37,37 +37,38 @@
       <div class="card" id="setupCard">
         <h2>Test details</h2>
         <div class="grid2">
-          <label>Building<input id="fBuilding" type="text" placeholder="e.g. Tower A" autocomplete="off"></label>
-          <label>Lift ID<input id="fLift" type="text" placeholder="e.g. Lift-01" autocomplete="off"></label>
-          <label>Departure floor<input id="fFrom" type="text" placeholder="e.g. G" autocomplete="off"></label>
-          <label>Arrival floor<input id="fTo" type="text" placeholder="e.g. 12" autocomplete="off"></label>
-          <label>Known travel height (m) <span class="muted">optional, improves accelerometer-only height</span><input id="fHeight" type="number" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 36.5"></label>
-          <label>Rated speed (m/s) <span class="muted">optional</span><input id="fRated" type="number" inputmode="decimal" step="0.05" min="0" placeholder="e.g. 2.5"></label>
+          <label>Building<input id="fBuilding" type="text" placeholder="e.g. Tower A" autocomplete="off"><small class="hint">Name of the building or site. Use exactly the same text for every run of a lift so History and Compare group them.</small></label>
+          <label>Lift ID<input id="fLift" type="text" placeholder="e.g. Lift-01" autocomplete="off"><small class="hint">Lift number as written on site, e.g. L-2. Keep it the same for all runs of this lift.</small></label>
+          <label>Departure floor<input id="fFrom" type="text" placeholder="e.g. G" autocomplete="off"><small class="hint">Floor where the run starts. A terminal floor (lowest or highest) gives the best result.</small></label>
+          <label>Arrival floor<input id="fTo" type="text" placeholder="e.g. 12" autocomplete="off"><small class="hint">Floor where the run ends. Run terminal to terminal for full speed and full shaft coverage.</small></label>
+          <label>Known travel height (m)<input id="fHeight" type="number" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 36.5"><small class="hint">Optional. Real travel height between the two floors in metres. Improves height, speed and the position of vibration events.</small></label>
+          <label>Rated speed (m/s)<input id="fRated" type="number" inputmode="decimal" step="0.05" min="0" placeholder="e.g. 2.5"><small class="hint">Optional. Rated speed from the nameplate. Needed for the speed PASS/FAIL (92–105 %) and the sound limit.</small></label>
+          <label>Phone top edge points to<select id="fOrient"><option value="door">Car door (recommended)</option><option value="side">Side wall</option></select><small class="hint">Which way the top edge of the phone points. ISO 18738: X = front-back (towards the door), Y = side-to-side. Keep the same for every run, and align a PMT sensor the same way when comparing.</small></label>
         </div>
         <details class="inner" id="isoSetup">
           <summary>ISO 18738 conditions (recorded in the report)</summary>
           <div class="grid2">
             <label>Persons in the car (max 2)
               <select id="fPersons"><option value="0">0 (remote start)</option><option value="1" selected>1</option><option value="2">2</option></select>
-            </label>
-            <label>Notes <span class="muted">optional</span><input id="fNote" type="text" placeholder="load, drive setting, etc." autocomplete="off"></label>
+            <small class="hint">People inside the car during the run. ISO 18738 allows at most 2. 0 = car called from outside.</small></label>
+            <label>Notes<input id="fNote" type="text" placeholder="load, drive setting, etc." autocomplete="off"><small class="hint">Optional free text, e.g. load, drive setting or what was changed since the last run. Printed in the report.</small></label>
           </div>
-          <label class="check"><input id="fFan" type="checkbox"> Car fan / air-conditioning is OFF</label>
-          <label class="check"><input id="fChime" type="checkbox"> Alarms, chimes and announcements are OFF</label>
-          <label class="check"><input id="fPlaced" type="checkbox"> Phone is flat on the normal floor covering, within 100 mm of the floor centre</label>
+          <label class="check"><input id="fFan" type="checkbox"> Car fan / air-conditioning is OFF</label><small class="hint chk">Fan and air-conditioning noise disturb the sound and vibration readings.</small>
+          <label class="check"><input id="fChime" type="checkbox"> Alarms, chimes and announcements are OFF</label><small class="hint chk">Switch off chimes and voice announcements while recording.</small>
+          <label class="check"><input id="fPlaced" type="checkbox"> Phone is flat on the normal floor covering, within 100 mm of the floor centre</label><small class="hint chk">ISO 18738 6.2: phone flat on the normal floor, near the centre, not on a mat or carpet.</small>
           <p class="muted small">Anything left unticked is stated as “not confirmed” in the report (ISO 18738 6.1.2 / 6.1.3 / 6.2).</p>
         </details>
         <details class="inner" id="liftData">
           <summary>Lift data for vibration-source analysis (optional)</summary>
           <p class="muted small">Used to match vibration frequencies to rotating parts and repeating shaft items. Leave a field empty if you do not know it.</p>
           <div class="grid2">
-            <label>Roping<select id="dRoping"><option value="1">1:1</option><option value="2">2:1</option><option value="4">4:1</option></select></label>
-            <label>Traction sheave diameter (mm)<input id="aSheave" type="number" inputmode="decimal" step="1" min="0" placeholder="e.g. 400"></label>
-            <label>Gear ratio <span class="muted">1 = gearless</span><input id="dGear" type="number" inputmode="decimal" step="0.01" min="1" placeholder="1"></label>
-            <label>Motor poles <span class="muted">e.g. 20 for a PM gearless</span><input id="dPoles" type="number" inputmode="numeric" step="2" min="2" placeholder="e.g. 20"></label>
-            <label>Roller guide diameter (mm) <span class="muted">roller guides only</span><input id="aRoller" type="number" inputmode="decimal" step="1" min="0" placeholder="e.g. 125"></label>
-            <label>Guide rail length (m)<input id="dRail" type="number" inputmode="decimal" step="0.1" min="0.5" placeholder="5"></label>
-            <label>Rail bracket spacing (m)<input id="dBracket" type="number" inputmode="decimal" step="0.1" min="0.5" placeholder="e.g. 2.5"></label>
+            <label>Roping<select id="dRoping"><option value="1">1:1</option><option value="2">2:1</option><option value="4">4:1</option></select><small class="hint">Roping ratio of the lift (1:1, 2:1 or 4:1). Used to find the sheave and motor frequencies.</small></label>
+            <label>Traction sheave diameter (mm)<input id="aSheave" type="number" inputmode="decimal" step="1" min="0" placeholder="e.g. 400"><small class="hint">Traction sheave diameter in mm, from the machine nameplate or drawing.</small></label>
+            <label>Gear ratio<input id="dGear" type="number" inputmode="decimal" step="0.01" min="1" placeholder="1"><small class="hint">Gear ratio of the machine. Enter 1 for a gearless machine.</small></label>
+            <label>Motor poles<input id="dPoles" type="number" inputmode="numeric" step="2" min="2" placeholder="e.g. 20"><small class="hint">Number of motor poles (e.g. 20 for a PM gearless). Gives the motor electrical frequency.</small></label>
+            <label>Roller guide diameter (mm)<input id="aRoller" type="number" inputmode="decimal" step="1" min="0" placeholder="e.g. 125"><small class="hint">Roller guide wheel diameter in mm. Leave empty for sliding guide shoes.</small></label>
+            <label>Guide rail length (m)<input id="dRail" type="number" inputmode="decimal" step="0.1" min="0.5" placeholder="5"><small class="hint">Length of one guide rail section, usually 5 m. Used to find rail-joint vibration.</small></label>
+            <label>Rail bracket spacing (m)<input id="dBracket" type="number" inputmode="decimal" step="0.1" min="0.5" placeholder="e.g. 2.5"><small class="hint">Distance between rail brackets in metres, from the shaft drawing.</small></label>
           </div>
         </details>
         <ol class="steps small">
@@ -91,11 +92,12 @@
           <div id="lvSBox"><span class="k">Sound</span><b id="lvS">–</b><small>dB(A)</small></div>
         </div>
         <canvas id="liveChart" class="chart small-chart" aria-label="Live acceleration chart"></canvas>
-        <label class="check"><input id="fSound" type="checkbox" checked> Record sound level (microphone)</label>
+        <label class="check"><input id="fSound" type="checkbox" checked> Record sound level (microphone)</label><small class="hint chk">Records the sound level in dB(A) with the microphone during the run. Untick if not needed.</small>
         <div class="row gap">
           <button id="btnStart" class="btn primary big">Start</button>
           <button id="btnStop" class="btn danger big" disabled>Stop &amp; analyse</button>
         </div>
+        <ul class="hint-list"><li><b>Start</b> — begins recording. Keep still for the first 3 s (calibration), then call the lift.</li><li><b>Stop &amp; analyse</b> — tap after the doors open and the car is still. The result opens in Results and is saved in History.</li></ul>
         <p id="recMsg" class="muted small" role="status" aria-live="polite"></p>
       </div>
     </section>
@@ -147,19 +149,25 @@
         <div class="card">
           <h2>Correct the height and recalculate</h2>
           <div class="row gap wrap">
-            <label class="grow">Actual travel height (m)<input id="rHeight" type="number" inputmode="decimal" step="0.01" min="0"></label>
+            <label class="grow">Actual travel height (m)<input id="rHeight" type="number" inputmode="decimal" step="0.01" min="0"><small class="hint">Measured or drawing travel height in metres. Recalculate rescales speed, height and event positions.</small></label>
             <button id="btnRecalc" class="btn">Recalculate</button>
           </div>
         </div>
         <div class="card chart-tools" id="chartTools">
           <h2>Charts</h2>
           <div class="row gap wrap">
-            <div class="seg" role="group" aria-label="Vibration signal"><button id="cmIso" class="seg-b active" type="button">ISO-weighted</button><button id="cmRaw" class="seg-b" type="button">Unfiltered</button></div>
+            <button id="cmIso" class="btn iso-btn" type="button" aria-pressed="false">Apply ISO filter</button>
             <div class="seg" role="group" aria-label="Layout"><button id="clGrid" class="seg-b active" type="button">Grid</button><button id="clStack" class="seg-b" type="button">Stacked</button></div>
-            <label class="check"><input id="cLimits" type="checkbox" checked> Limit lines</label>
+            <span id="cLimitsWrap" hidden><label class="check"><input id="cLimits" type="checkbox" checked> Limit lines</label></span>
             <button id="cReset" class="btn small-btn" type="button">Reset zoom</button>
           </div>
-          <p class="muted small">Click or tap a curve to read time, value, lift position and speed. Drag across a chart (mouse), pinch (touch) or Ctrl + wheel to zoom; all time charts zoom together. Y on each chart sets a manual scale.</p>
+          <p class="mode-note" id="chartModeNote" role="status"></p>
+          <ul class="hint-list">
+            <li><b>Apply ISO filter</b> — switches the vibration charts from the raw signal to the ISO-weighted signal and shows the limit lines, so you can compare with the ISO scale. Tap again to go back to raw.</li>
+            <li><b>Grid / Stacked</b> — charts side by side, or one under the other at full width (PMT style).</li>
+            <li><b>Reset zoom</b> — shows the whole ride again on every chart.</li>
+            <li>Tap or click a curve to read time, value, lift position and speed. Drag across a chart (mouse), pinch (touch) or Ctrl + wheel to zoom; all time charts zoom together. <b>Y</b> on a chart sets a manual scale.</li>
+          </ul>
         </div>
         <div class="charts" id="charts"></div>
         <div class="card">
@@ -170,6 +178,7 @@
             <button id="btnRaw" class="btn">Reading file</button>
             <button id="btnSend" class="btn" hidden>Send to admin</button>
           </div>
+        <ul class="hint-list"><li><b>PDF report</b> — 5-page PMT-style report with tables, curves and the source analysis.</li><li><b>CSV data</b> — every sample (raw, weighted, speed, height, region) for Excel.</li><li><b>Reading file</b> — the full record (with sound). Import it on the PC version to analyse again.</li><li><b>Send to admin</b> — uploads the record to the team cloud. Without internet it is queued.</li></ul>
           <p class="muted small">Reading file = the raw sensor data. Open it on the PC version (History → Import) to analyse it again.</p>
           <p class="muted small" id="exportMsg" role="status" aria-live="polite"></p>
         </div>
@@ -180,6 +189,7 @@
     <section id="screen-history" class="screen" aria-label="History">
       <div class="card">
         <div class="row between wrap"><h2>Saved records</h2><div class="row gap wrap"><button id="btnImport" class="btn small-btn">Import reading file</button><button id="btnClearAll" class="btn small-btn danger-o">Delete all</button></div></div>
+        <ul class="hint-list"><li><b>Import reading file</b> — opens a .lrm.json file sent from a phone.</li><li><b>Delete all</b> — removes every record on this device (cloud copies stay).</li><li><b>Compare selected</b> — tick 2 or more runs of the same lift, then compare them to find the vibration source.</li></ul>
         <input id="fileImport" type="file" accept=".json,.lrm,application/json" hidden>
         <p id="impMsg" class="muted small" role="status" aria-live="polite"></p>
         <p id="syncLine" class="muted small" hidden></p>
@@ -210,10 +220,11 @@
       <div class="card">
         <div class="row between wrap"><h2>Team records (cloud)</h2>
           <div class="row gap wrap"><button id="adRefresh" class="btn small-btn">Refresh</button><button id="adCsv" class="btn small-btn">Summary CSV</button></div></div>
+        <ul class="hint-list"><li><b>Refresh</b> — loads the latest team records.</li><li><b>Summary CSV</b> — one row per record for Excel. Open a record to see its full analysis.</li></ul>
         <div class="grid2">
-          <label>Search<input id="adQ" type="search" placeholder="building, lift or user" autocomplete="off"></label>
-          <label>User<select id="adUser"><option value="">All users</option></select></label>
-          <label>Direction<select id="adDir"><option value="">UP and DOWN</option><option value="up">UP</option><option value="down">DOWN</option></select></label>
+          <label>Search<input id="adQ" type="search" placeholder="building, lift or user" autocomplete="off"><small class="hint">Type part of a building, lift or user name to filter the list.</small></label>
+          <label>User<select id="adUser"><option value="">All users</option></select><small class="hint">Show the records of one user only.</small></label>
+          <label>Direction<select id="adDir"><option value="">UP and DOWN</option><option value="up">UP</option><option value="down">DOWN</option></select><small class="hint">Show only UP runs, only DOWN runs, or both.</small></label>
         </div>
         <p id="adMsg" class="muted small" role="status" aria-live="polite"></p>
         <div class="table-wrap"><table id="adTbl"></table></div>
@@ -223,12 +234,12 @@
         <div class="table-wrap"><table id="usTbl"></table></div>
         <h3>Add a user</h3>
         <div class="grid2">
-          <label>Full name<input id="usName" type="text" autocomplete="off"></label>
-          <label>ID (letters, digits . _ -)<input id="usUser" type="text" autocomplete="off" autocapitalize="none"></label>
-          <label>Section<input id="usSection" type="text" autocomplete="off"></label>
-          <label>Email<input id="usEmail" type="email" autocomplete="off"></label>
-          <label>Password (6+ characters)<input id="usPass" type="text" autocomplete="off" autocapitalize="none"></label>
-          <label>Role<select id="usRole"><option value="user">User (own records only)</option><option value="admin">Admin (all records)</option></select></label>
+          <label>Full name<input id="usName" type="text" autocomplete="off"><small class="hint">Full name of the new user.</small></label>
+          <label>ID (letters, digits . _ -)<input id="usUser" type="text" autocomplete="off" autocapitalize="none"><small class="hint">Login ID. Letters, digits, dot, dash and underscore only.</small></label>
+          <label>Section<input id="usSection" type="text" autocomplete="off"><small class="hint">Department or section of the user.</small></label>
+          <label>Email<input id="usEmail" type="email" autocomplete="off"><small class="hint">Email address of the user.</small></label>
+          <label>Password (6+ characters)<input id="usPass" type="text" autocomplete="off" autocapitalize="none"><small class="hint">First password for the user (6 or more characters). The user can change it later.</small></label>
+          <label>Role<select id="usRole"><option value="user">User (own records only)</option><option value="admin">Admin (all records)</option></select><small class="hint">User = sees own records only. Admin = sees all records and approves requests.</small></label>
         </div>
         <button id="usAdd" class="btn primary">Add user</button>
         <p id="usMsg" class="muted small" role="status" aria-live="polite"></p>
@@ -241,12 +252,13 @@
         <div class="row between wrap"><h2>Cloud (team)</h2><span id="cloudChip" class="chip">Not connected</span></div>
         <p class="muted small">Records stay on this phone. Tap <b>Send</b> on a record (History or Results) to send it to the administrator. If there is no internet, it is queued and sent when the internet is back.</p>
         <label id="cloudUrlRow">Cloud URL (Apps Script web app, ends with /exec — or type demo)
-          <input id="cUrl" type="text" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+          <input id="cUrl" type="text" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="none" spellcheck="false"><small class="hint">Web-app address from the administrator. Type demo to try the fictional demo server.</small></label>
         <div class="row gap wrap" style="margin-top:8px">
           <button id="cSave" class="btn">Save URL</button>
           <button id="cSync" class="btn">Send queued now</button>
           <button id="cLogout" class="btn danger-o">Sign out</button>
         </div>
+        <ul class="hint-list"><li><b>Save URL</b> — stores the cloud address.</li><li><b>Send queued now</b> — sends records waiting for internet.</li><li><b>Sign out</b> — ends your session on this device.</li></ul>
         <p id="cMsg" class="muted small" role="status" aria-live="polite"></p>
         <details class="inner" id="cPwBox"><summary>Change my password</summary>
           <div class="grid2">
@@ -265,13 +277,13 @@
         <div class="grid2">
           <label>Theme
             <select id="sTheme"><option value="system">Follow system</option><option value="light">Light</option><option value="dark">Dark</option></select>
-          </label>
+          <small class="hint">Light, dark or follow the phone / PC setting.</small></label>
           <label>Data source
             <select id="sSource"><option value="auto">Automatic (phone sensors)</option><option value="demo">DEMO (fictional data)</option></select>
-          </label>
+          <small class="hint">Automatic = real phone sensors. DEMO = fictional sample data for training and testing only.</small></label>
           <label>DEMO playback speed
             <select id="sDemoSpeed"><option value="1">1× (real time)</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
-          </label>
+          <small class="hint">How fast a DEMO ride plays back. Has no effect on real measurements.</small></label>
         </div>
       </div>
 
@@ -279,13 +291,14 @@
         <h2>Instrument and report details</h2>
         <p class="muted small">Printed in the PDF report (ISO 18738 6.5 a).</p>
         <div class="grid2">
-          <label>Measured by<input id="sOperator" type="text" placeholder="name(s)" autocomplete="off"></label>
-          <label>Organisation<input id="sOrg" type="text" placeholder="company / team" autocomplete="off"></label>
-          <label>Instrument ID<input id="sInstr" type="text" placeholder="e.g. Realme 8 RMX3085" autocomplete="off"></label>
+          <label>Measured by<input id="sOperator" type="text" placeholder="name(s)" autocomplete="off"><small class="hint">Name of the person who made the measurement. Printed in the PDF report.</small></label>
+          <label>Organisation<input id="sOrg" type="text" placeholder="company / team" autocomplete="off"><small class="hint">Company or team name. Printed in the PDF report.</small></label>
+          <label>Instrument ID<input id="sInstr" type="text" placeholder="e.g. Realme 8 RMX3085" autocomplete="off"><small class="hint">Phone model or an ID for this phone, so results from different phones are not mixed.</small></label>
         </div>
         <h3>Sensor check (phone as instrument)</h3>
         <p class="muted small">Put the phone flat and still, then run a 10-second check. It tests sampling rate, gravity (0 Hz accuracy), noise, resolution and the vibration noise floor, as in ISO 18738 4.6.3. The date is saved as the “last check” in the report.</p>
         <div class="row gap wrap"><button id="btnCheck" class="btn">Run 10 s sensor check</button><span id="checkState" class="chip" hidden></span></div>
+        <ul class="hint-list"><li><b>Run 10 s sensor check</b> — phone flat and still on a table; checks sample rate, gravity, noise and resolution.</li></ul>
         <div class="table-wrap"><table id="checkTbl"></table></div>
         <p class="muted small" id="checkMsg" role="status" aria-live="polite"></p>
       </div>
@@ -295,20 +308,21 @@
         <p class="muted small">ISO 18738 gives the measuring method only, not acceptable values. <b>Reference</b> = default set (speed 92–105 % of rated and acceleration 1.5 m/s² as in GB/T 10058, the rest common screening values). <b>Manual</b> = your own values, e.g. from the contract.</p>
         <div class="seg" role="group" aria-label="Limit set"><button id="lsRef" class="seg-b active" type="button">Reference (default)</button><button id="lsMan" class="seg-b" type="button">Manual</button></div>
         <div class="grid2" id="limGrid">
-          <label>Max vertical vibration p-p (mg)<input id="lMaxv" type="number" step="1" min="0"></label>
-          <label>A95 vertical, p-p (mg)<input id="lA95v" type="number" step="1" min="0"></label>
-          <label>Max horizontal vibration p-p (mg)<input id="lMaxh" type="number" step="1" min="0"></label>
-          <label>A95 horizontal, p-p (mg)<input id="lA95h" type="number" step="1" min="0"></label>
-          <label>Max jerk (m/s³)<input id="lJerk" type="number" step="0.1" min="0"></label>
-          <label>Max acceleration (m/s²)<input id="lAccel" type="number" step="0.05" min="0"></label>
-          <label>Max deceleration (m/s²)<input id="lDecel" type="number" step="0.05" min="0"></label>
-          <label>Speed lower limit (% of rated)<input id="lSpeedLo" type="number" step="1" min="0"></label>
-          <label>Speed upper limit (% of rated)<input id="lSpeedHi" type="number" step="1" min="0"></label>
-          <label>Max sound, rated speed ≤ 2.5 m/s (dB(A))<input id="lSound" type="number" step="1" min="0"></label>
-          <label>Max sound, rated speed &gt; 2.5 m/s (dB(A))<input id="lSoundHi" type="number" step="1" min="0"></label>
-          <label>ISO 2631-1 curve level (m/s²)<input id="lComfort" type="number" step="0.005" min="0.01"></label>
+          <label>Max vertical vibration p-p (mg)<input id="lMaxv" type="number" step="1" min="0"><small class="hint">Largest vertical peak-to-peak allowed in the constant-acceleration region.</small></label>
+          <label>A95 vertical, p-p (mg)<input id="lA95v" type="number" step="1" min="0"><small class="hint">Vertical A95 peak-to-peak limit: 95 % of the vertical peaks must stay below it.</small></label>
+          <label>Max horizontal vibration p-p (mg)<input id="lMaxh" type="number" step="1" min="0"><small class="hint">Largest horizontal (X or Y) peak-to-peak allowed between boundaries 1 and 2.</small></label>
+          <label>A95 horizontal, p-p (mg)<input id="lA95h" type="number" step="1" min="0"><small class="hint">Horizontal A95 peak-to-peak limit for X and Y.</small></label>
+          <label>Max jerk (m/s³)<input id="lJerk" type="number" step="0.1" min="0"><small class="hint">Largest rate of change of acceleration allowed.</small></label>
+          <label>Max acceleration (m/s²)<input id="lAccel" type="number" step="0.05" min="0"><small class="hint">Largest acceleration allowed when the car speeds up.</small></label>
+          <label>Max deceleration (m/s²)<input id="lDecel" type="number" step="0.05" min="0"><small class="hint">Largest deceleration allowed when the car slows down.</small></label>
+          <label>Speed lower limit (% of rated)<input id="lSpeedLo" type="number" step="1" min="0"><small class="hint">Lowest steady speed allowed, in % of the rated speed.</small></label>
+          <label>Speed upper limit (% of rated)<input id="lSpeedHi" type="number" step="1" min="0"><small class="hint">Highest steady speed allowed, in % of the rated speed.</small></label>
+          <label>Max sound, rated speed ≤ 2.5 m/s (dB(A))<input id="lSound" type="number" step="1" min="0"><small class="hint">Sound limit inside the car for lifts up to 2.5 m/s.</small></label>
+          <label>Max sound, rated speed &gt; 2.5 m/s (dB(A))<input id="lSoundHi" type="number" step="1" min="0"><small class="hint">Sound limit inside the car for lifts faster than 2.5 m/s.</small></label>
+          <label>ISO 2631-1 curve level (m/s²)<input id="lComfort" type="number" step="0.005" min="0.01"><small class="hint">Level of the ISO 2631-1 comfort curve drawn on the 1/3-octave charts.</small></label>
         </div>
         <button id="btnLimitsReset" class="btn small-btn">Copy reference values into Manual</button>
+        <ul class="hint-list"><li><b>Reference</b> — default limits, used unless you choose Manual.</li><li><b>Manual</b> — your own values (e.g. from the contract). Results update at once, no new recording needed.</li><li><b>Copy reference values into Manual</b> — start Manual from the reference set, then change only what you need.</li></ul>
         <p class="muted small" id="limMsg" role="status"></p>
       </div>
 
@@ -316,19 +330,20 @@
         <h2>Sound level (microphone)</h2>
         <p class="muted small">The phone / PC microphone gives an <b>indicative</b> A-weighted level (FAST, 125 ms). For trustworthy values calibrate once against a sound level meter: put both side by side in a steady noise (e.g. a fan), type the meter reading and tap Calibrate.</p>
         <div class="grid2">
-          <label>Calibration offset (dB)<input id="sOffset" type="number" step="0.1"></label>
-          <label>Sound level meter reading (dB(A))<input id="sMeter" type="number" step="0.1" placeholder="e.g. 62.0"></label>
+          <label>Calibration offset (dB)<input id="sOffset" type="number" step="0.1"><small class="hint">Added to the microphone reading. Set automatically by Calibrate; change only if you know the correct offset.</small></label>
+          <label>Sound level meter reading (dB(A))<input id="sMeter" type="number" step="0.1" placeholder="e.g. 62.0"><small class="hint">Reading of a real sound level meter placed next to the phone in a steady noise. Then tap Calibrate.</small></label>
         </div>
         <div class="row gap wrap"><button id="btnCal" class="btn" type="button">Calibrate (measure 5 s)</button><button id="btnSndTest" class="btn small-btn" type="button">Test microphone</button><span id="calChip" class="chip"></span></div>
+        <ul class="hint-list"><li><b>Calibrate</b> — measures 5 s and sets the offset so the app reads the same as the meter.</li><li><b>Test microphone</b> — shows the live level to check that the microphone works.</li></ul>
         <p class="muted small" id="calMsg" role="status" aria-live="polite"></p>
       </div>
 
       <div class="card">
         <h2>Analysis settings</h2>
         <div class="grid2">
-          <label>Accel / jerk low-pass (Hz) <span class="muted">ISO 18738 = 10</span><input id="aLp" type="number" step="0.5" min="1" max="20"></label>
-          <label>Barometer fusion time constant τ (s)<input id="aTau" type="number" step="0.5" min="0.5" max="10"></label>
-          <label class="check"><input id="aBaro" type="checkbox"> Use barometer when the phone has one</label>
+          <label>Accel / jerk low-pass (Hz)<input id="aLp" type="number" step="0.5" min="1" max="20"><small class="hint">Low-pass filter for acceleration and jerk. ISO 18738 uses 10 Hz; lower values smooth a noisy phone but are no longer ISO.</small></label>
+          <label>Barometer fusion time constant τ (s)<input id="aTau" type="number" step="0.5" min="0.5" max="10"><small class="hint">How fast the barometer corrects the height. Leave at 2 s unless told otherwise.</small></label>
+          <label class="check"><input id="aBaro" type="checkbox"> Use barometer when the phone has one</label><small class="hint chk">Fuses barometer height when the phone has one. The accelerometer alone also works.</small>
         </div>
         <p class="muted small">Defaults follow the standard (10 Hz 2-pole Butterworth, τ = 2 s). A lower low-pass (e.g. 2–4 Hz) gives smoother acceleration and jerk on a noisy phone, but is no longer the ISO value.</p>
       </div>
@@ -338,7 +353,7 @@
         <details open><summary>1. How to measure</summary>
           <ol>
             <li>Keep the screen on. The app keeps it awake while recording.</li>
-            <li>Place the phone flat on the car floor within about 100 mm of the centre (ISO 18738 6.2). Do not hold it, and do not put it on soft material.</li>
+            <li>Place the phone flat on the car floor within about 100 mm of the centre (ISO 18738 6.2), top edge towards the car door (or set “Phone top edge points to”). Then X = front-back and Y = side-to-side as in ISO 18738. Do not hold it, remove a soft phone case, and do not put it on a mat or carpet.</li>
             <li>Tap Start and stay still for 3 seconds. The app measures gravity, the vertical and horizontal axes and the sensor noise floor.</li>
             <li>Run the lift from terminal to terminal. Wait about 1 second after the doors open, then tap Stop. The last 0.5 s is ignored to remove the touch of the Stop button.</li>
             <li>Record at least one UP and one DOWN run. At most two persons in the car, each still and quiet, feet more than 150 mm from the phone.</li>
@@ -354,9 +369,9 @@
             <li><b>Jerk:</b> slope of a 0.5 s running least-squares line of the acceleration; the maximum is reported.</li>
             <li><b>Max / V95 speed:</b> V95 is evaluated from 1 s after the car reaches 95 % of its top speed until 1 s before it drops below 95 %.</li>
             <li><b>Vibration (p-p):</b> weighted signal; each peak-to-peak value is taken between zero crossings 1–3, 2–4, 3–5… Max is the largest, A95 is the value 95 % of them do not exceed. The 0-pk column is the largest single peak.</li>
-            <li><b>Constant / non-constant region:</b> the vertical signal is split by the slope of the acceleration (above 0.3 m/s³, plus 0.5 s either side = non-constant). Door-close and start/stop transients fall in the non-constant region.</li>
+            <li><b>Constant / non-constant region (jerk zone):</b> the vertical signal is split by the slope of the acceleration (above 0.3 m/s³, plus 0.5 s either side = non-constant). The second before the car moves and the second after it stops (brake lift and brake drop) also belong to the jerk zone, as in PMT EVA.</li>
             <li><b>Boundaries:</b> boundary 1 and 2 are 500 mm after the start and before the stop (from the integrated height). X and Y vibration are evaluated between them.</li>
-            <li><b>Charts:</b> tap or click a curve to read time, value, the lift position in the shaft and the speed. Drag across (mouse), pinch (touch) or Ctrl + wheel to zoom; double-click or ⟲ to reset. ISO-weighted / Unfiltered switches the vibration signal, like the ISO / Raw filter of a PMT EVA. Limit lines: ±(max p-p ÷ 2) on vibration, ± limits on acceleration and jerk, 92–105 % on speed, the dB(A) limit on sound.</li>
+            <li><b>Charts:</b> they open with the <b>unfiltered</b> (raw) signal, as PMT EVA does. Tap <b>Apply ISO filter</b> to see the ISO-weighted signal with the limit lines, the jerk zone in teal, + on the max peak-to-peak and o on the jerk-zone max. Tap or click a curve to read time, value, the lift position and the speed. Drag across (mouse), pinch (touch) or Ctrl + wheel to zoom; double-click or ⟲ to reset.</li>
             <li><b>Vibration source finder:</b> looks at the axis, the ride phase, the position and the frequency of the vibration and matches them with the lift data (sheave, roping, gear, motor poles, rollers, rail length, bracket spacing). With several runs (History → Compare) it also finds heights that repeat in up and down runs and frequencies that follow the speed.</li>
           </ul>
         </details>

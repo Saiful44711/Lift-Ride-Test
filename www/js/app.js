@@ -4,7 +4,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var Core = window.LiftCore;
-  var APP_VERSION = '2.2.0';
+  var APP_VERSION = '2.2.1';
   var params = new URLSearchParams(location.search);
 
   /* ---------------- settings ---------------- */
@@ -15,8 +15,8 @@
     limitSet: 'reference', limitsManual: null,
     lift: { roping: '1', gear: '', poles: '', rail: '', bracket: '' },
     recSound: true, soundOffset: 110, soundCal: false,
-    chartMode: 'iso', chartLayout: 'grid', chartLimits: true,
-    form: { building: '', lift: '', from: '', to: '', height: '', rated: '', note: '', persons: '1', fan: false, chime: false, placed: false }
+    chartMode: 'raw', chartLayout: 'grid', chartLimits: true,
+    form: { building: '', lift: '', from: '', to: '', height: '', rated: '', note: '', persons: '1', orient: 'door', fan: false, chime: false, placed: false }
   };
   (function load() {
     var saved = Store.loadSettings();
@@ -27,6 +27,7 @@
     if (!S.limitsManual) S.limitsManual = Object.assign({}, Core.DEFAULT_LIMITS, saved && saved.limits ? saved.limits : {});
     S.limitsManual = Object.assign({}, Core.DEFAULT_LIMITS, S.limitsManual);
     if (!(S.lpDyn >= 1)) S.lpDyn = 10;
+    S.chartMode = 'raw'; // v2.2.1: charts open unfiltered (as PMT EVA); the ISO filter button switches
     if (params.get('source')) S.source = params.get('source');
     if (params.get('demoSpeed')) S.demoSpeed = Number(params.get('demoSpeed')) || 1;
     if (params.get('theme')) S.theme = params.get('theme');
@@ -97,7 +98,7 @@
   var rec = null, uiTimer = null, current = null, checking = false;
   var CAL_END = 3.2;
 
-  var FORM_TEXT = { fBuilding: 'building', fLift: 'lift', fFrom: 'from', fTo: 'to', fHeight: 'height', fRated: 'rated', fNote: 'note', fPersons: 'persons' };
+  var FORM_TEXT = { fBuilding: 'building', fLift: 'lift', fFrom: 'from', fTo: 'to', fHeight: 'height', fRated: 'rated', fNote: 'note', fPersons: 'persons', fOrient: 'orient' };
   var FORM_CHECK = { fFan: 'fan', fChime: 'chime', fPlaced: 'placed' };
   function readForm() {
     Object.keys(FORM_TEXT).forEach(function (id) { S.form[FORM_TEXT[id]] = $(id).value.trim(); });
@@ -244,12 +245,12 @@
       floors: [from, to].filter(Boolean).join(' → '), note: (demo ? 'DEMO (fictional data) ' : '') + F.note,
       date: fmtDate(Date.now()), knownHeight: numOrNull(F.height), rated: numOrNull(F.rated), source: info.mode, demo: demo, baroAvailable: !!info.baro,
       liftData: liftObj(),
-      persons: F.persons, fan: !!F.fan, chime: !!F.chime, placed: !!F.placed,
+      persons: F.persons, orient: F.orient || 'door', fan: !!F.fan, chime: !!F.chime, placed: !!F.placed,
       operator: S.operator, org: S.org, instr: S.instr || info.accelName || (demo ? 'DEMO (simulated sensor)' : 'Phone accelerometer'),
       lastCheck: S.lastCheck ? S.lastCheck.date + (S.lastCheck.ok ? ' (passed)' : ' (warnings)') : 'not done' };
   }
   function analysisOpts(meta) {
-    return { lpDyn: S.lpDyn, tau: S.tau, useBaro: S.useBaro, limits: effLimits(), limitSet: S.limitSet, knownHeight: meta.knownHeight, ratedSpeed: meta.rated,
+    return { lpDyn: S.lpDyn, tau: S.tau, useBaro: S.useBaro, limits: effLimits(), limitSet: S.limitSet, knownHeight: meta.knownHeight, ratedSpeed: meta.rated, orient: meta.orient || 'door',
       rollerDiaMm: numOrNull(S.rollerDia), sheaveDiaMm: numOrNull(S.sheaveDia), soundOffset: Number(S.soundOffset) || 0, soundCalibrated: !!S.soundCal };
   }
   function summarize(res) {
@@ -269,7 +270,7 @@
   }
   function table(id, head, rows) {
     var tb = $(id); tb.textContent = '';
-    var hr = el('tr'); head.forEach(function (h, i) { var th = el('th', '', h); if (i) th.style.textAlign = 'right'; hr.appendChild(th); }); tb.appendChild(hr);
+    var hr = el('tr'); head.forEach(function (h, i) { hr.appendChild(el('th', i ? 'num' : '', h)); }); tb.appendChild(hr);
     rows.forEach(function (r) { var tr = el('tr'); r.forEach(function (c, i) { tr.appendChild(td(c, i ? 'num' : '')); }); tb.appendChild(tr); });
   }
   function renderResults() {
@@ -334,13 +335,13 @@
   }
   function renderVerdicts(res) {
     var tb = $('verdictTbl'); tb.textContent = '';
-    var head = el('tr'); ['Parameter', 'Measured', 'Limit', '% Limit', 'Status'].forEach(function (h) { head.appendChild(el('th', '', h)); }); tb.appendChild(head);
+    var head = el('tr'); ['Parameter', 'Measured', 'Limit', '% Limit', 'Status'].forEach(function (h, i) { head.appendChild(el('th', i === 0 ? '' : i === 4 ? 'ctr' : 'num', h)); }); tb.appendChild(head);
     res.verdicts.forEach(function (v) {
       var tr = el('tr'); tr.appendChild(el('td', '', v.label));
       tr.appendChild(el('td', 'num', v.value.toFixed(v.dp) + ' ' + v.unit));
       tr.appendChild(el('td', 'num', v.band ? v.lo + '–' + v.hi + ' % of ' + v.limit + ' ' + v.unit : '≤ ' + v.limit + ' ' + v.unit));
       tr.appendChild(el('td', 'num', v.db ? (v.margin >= 0 ? '+' : '') + v.margin.toFixed(1) + ' dB' : v.pct === null || v.pct === undefined ? '–' : v.pct.toFixed(1) + ' %'));
-      var c = el('td'); c.appendChild(chip(v.ok ? '✓ PASS' : '✗ FAIL', v.ok ? 'ok' : 'bad')); tr.appendChild(c); tb.appendChild(tr);
+      var c = el('td', 'ctr'); c.appendChild(chip(v.ok ? '✓ PASS' : '✗ FAIL', v.ok ? 'ok' : 'bad')); tr.appendChild(c); tb.appendChild(tr);
     });
     var lc = $('limChip'); lc.textContent = S.limitSet === 'manual' ? 'Manual limits' : 'Reference limits'; lc.className = 'chip ' + (S.limitSet === 'manual' ? 'warn' : 'ok');
     $('limNote').textContent = S.limitSet === 'manual' ? 'Your own limits (More → Limits). ISO 18738 defines the method, not pass / fail values.' :
@@ -377,7 +378,7 @@
   var chartUI = null, chartState = { view: {}, cursor: {}, yScale: {} }, chartFor = null;
   function renderCharts() {
     if (!current) return;
-    if (chartFor !== current.res) { if (!chartFor || !current.res || chartFor.t.length !== current.res.t.length) chartState = { view: {}, cursor: {}, yScale: chartState.yScale }; chartFor = current.res; }
+    if (chartFor !== current.res) { if (!chartFor || !current.res || chartFor.t.length !== current.res.t.length) { chartState = { view: {}, cursor: {}, yScale: chartState.yScale }; S.chartMode = 'raw'; } chartFor = current.res; }
     var host = $('charts');
     host.classList.toggle('stacked', S.chartLayout === 'stack');
     var items = Report.chartConfigs(current.res, effLimits(), { mode: S.chartMode, lift: liftObj(), limits: S.chartLimits });
@@ -387,12 +388,17 @@
     }
     chartUI = ChartUI.mount(host, items, { res: current.res, state: chartState });
     chartUI.redraw();
-    $('cmIso').classList.toggle('active', S.chartMode !== 'raw'); $('cmRaw').classList.toggle('active', S.chartMode === 'raw');
+    var isoOn = S.chartMode === 'iso', ib = $('cmIso');
+    ib.classList.toggle('active', isoOn); ib.setAttribute('aria-pressed', isoOn ? 'true' : 'false');
+    ib.textContent = isoOn ? 'ISO filter: ON' : 'Apply ISO filter';
+    $('cLimitsWrap').hidden = !isoOn;
+    $('chartModeNote').textContent = isoOn
+      ? 'ISO-weighted (ISO 18738 / ISO 2631-1: Wk vertical, Wd horizontal). Red dashed lines = your limits. Teal = jerk zone. + = max peak-to-peak, o = jerk-zone max. Tap the button again for the raw signal.'
+      : 'Unfiltered raw signal, as PMT EVA shows first. Tap “Apply ISO filter” to compare with the ISO scale and the limits.';
     $('clGrid').classList.toggle('active', S.chartLayout !== 'stack'); $('clStack').classList.toggle('active', S.chartLayout === 'stack');
     $('cLimits').checked = S.chartLimits !== false;
   }
-  $('cmIso').addEventListener('click', function () { S.chartMode = 'iso'; save(); renderCharts(); });
-  $('cmRaw').addEventListener('click', function () { S.chartMode = 'raw'; save(); renderCharts(); });
+  $('cmIso').addEventListener('click', function () { S.chartMode = S.chartMode === 'iso' ? 'raw' : 'iso'; renderCharts(); });
   $('clGrid').addEventListener('click', function () { S.chartLayout = 'grid'; save(); renderCharts(); });
   $('clStack').addEventListener('click', function () { S.chartLayout = 'stack'; save(); renderCharts(); });
   $('cLimits').addEventListener('change', function () { S.chartLimits = this.checked; save(); renderCharts(); });

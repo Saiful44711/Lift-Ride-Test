@@ -399,6 +399,10 @@
       h1[i] = ax[i] * e1x + ay[i] * e1y + az[i] * e1z;
       h2[i] = ax[i] * e2x + ay[i] * e2y + az[i] * e2z;
     }
+    // v2.2.1: ISO 18738 x = back-to-front (perpendicular to the car door), y = side-to-side.
+    // h1 follows the phone's short edge, h2 its long edge. With the top edge towards the door (default)
+    // the long edge is front-back, so x = h2 and y = h1. 'side' = top edge towards a side wall.
+    if (o.orient !== 'side') { var hs = h1; h1 = h2; h2 = hs; }
     var m1 = mean(h1, c0, c1), m2 = mean(h2, c0, c1);
     for (i = 0; i < n; i++) { h1[i] -= m1; h2[i] -= m2; }
     // v2.1.1: the first calibStart seconds hold the touch of the Start button (and, on some phones, a few
@@ -535,6 +539,11 @@
     for (i = b0; i <= b3; i++) {
       if (Math.abs(slope1[i]) > 0.3) { var a1 = Math.max(b0, i - half5), a2 = Math.min(b3, i + half5); for (var q = a1; q <= a2; q++) nonc[q] = 1; }
     }
+    // v2.2.1: the brake lift / motor start jolt comes up to ~1 s before the car moves, and the brake drop
+    // up to ~1 s after it stops. They belong to the jerk zone (as in PMT EVA), not to "no region".
+    var pre = Math.floor(1.0 * fs);
+    for (i = Math.max(b0, tv0 - pre); i <= Math.min(b3, b1); i++) nonc[i] = 1;
+    for (i = Math.max(b0, b2); i <= Math.min(b3, tv1 + pre); i++) nonc[i] = 1;
     for (i = b1; i <= b2; i++) cons[i] = nonc[i] ? 0 : 1;
     var pc = prefix(cons);
     var lvZ = ppLevels(wz, b0, b3), lvX = ppLevels(wx, b1, b2), lvY = ppLevels(wy, b1, b2);
@@ -547,7 +556,9 @@
     }
     var xS = ppSummary(lvX, null), yS = ppSummary(lvY, null);
     var zpZ = zeroPeak(wz, cons, b1, b2), zpX = zeroPeak(wx, null, b1, b2), zpY = zeroPeak(wy, null, b1, b2);
-    var zpZN = zeroPeak(wz, nonc, b0, b3);
+    var zpZN = zeroPeak(wz, nonc, b0, b3), zpZall = zeroPeak(wz, null, b0, b3);
+    // where the max peak-to-peak sits (for the + and o markers on the charts, as in PMT EVA)
+    var mkOf = function (lv, q) { if (!q.n) return null; var best = -1, bi = -1; q.idx.forEach(function (k) { if (lv.p[k] > best) { best = lv.p[k]; bi = k; } }); return bi < 0 ? null : { s: lv.s[bi], e: lv.e[bi] }; };
 
     /* --- sensor noise floor: same estimator on the still calibration window --- */
     var nfLv = function (sig) { var lv = ppLevels(sig, c0, c1); return lv.p.length ? percentile(lv.p, 95) * MG : 0; };
@@ -676,6 +687,7 @@
         // ISO 18738 6.5 b) ride quality results (mg = milli-g, peak-to-peak)
         x: { max: xS.max, a95: xS.a95, zp: zpX }, y: { max: yS.max, a95: yS.a95, zp: zpY },
         zC: { max: zC.max, a95: zC.a95, zp: zpZ, n: zC.n }, zN: { max: zN.max, a95: zN.a95, zp: zpZN, n: zN.n },
+        zpZall: zpZall, mk: { zC: mkOf(lvZ, zC), zN: mkOf(lvZ, zN), x: mkOf(lvX, xS), y: mkOf(lvY, yS) },
         a95z: zC.a95, a95x: xS.a95, a95y: yS.a95, maxppZ: zC.max, maxppX: xS.max, maxppY: yS.max, maxppZN: zN.max,
         bb: { z: { max: bb.z.max, a95: bb.z.a95, zp: bb.z.zp }, x: { max: bb.x.max, a95: bb.x.a95, zp: bb.x.zp }, y: { max: bb.y.max, a95: bb.y.a95, zp: bb.y.zp } },
         raw: rawStats, aAvg: aAvg, dAvg: dAvg,

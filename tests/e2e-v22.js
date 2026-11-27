@@ -79,9 +79,16 @@ function check(name, ok, info) { console.log((ok ? 'PASS ' : 'FAIL ') + name + (
   // limit lines
   const hl = await page.evaluate(() => { const r = window.__LRM.current.res; return Report.chartConfigs(r, LiftCore.DEFAULT_LIMITS, {}).filter(c => c.id === 'vibz')[0].cfg.hlines.map(h => h.y); });
   check('vibration chart has ±(max p-p / 2) limit lines', hl.includes(15) && hl.includes(-15), hl.join(','));
-  // unfiltered
-  await page.click('#cmRaw'); await page.waitForTimeout(200);
-  check('Unfiltered switches the vibration charts', /unfiltered/.test(await page.evaluate(() => document.querySelector('[data-chart=vibz] canvas').getAttribute('aria-label'))));
+  // v2.2.1: charts open unfiltered; the ISO filter button switches to ISO-weighted and back
+  const lbl = () => page.evaluate(() => document.querySelector('[data-chart=vibz] canvas').getAttribute('aria-label'));
+  check('charts open unfiltered (PMT style)', /unfiltered/.test(await lbl()) && (await page.textContent('#cmIso')) === 'Apply ISO filter' && await page.isHidden('#cLimitsWrap'));
+  await page.click('#cmIso'); await page.waitForTimeout(200);
+  check('ISO filter button switches to ISO-weighted with limit-line option', /ISO-weighted/.test(await lbl()) && (await page.getAttribute('#cmIso', 'aria-pressed')) === 'true' && await page.isVisible('#cLimitsWrap'));
+  const iz = await page.evaluate(() => { const c = Report.chartConfigs(window.__LRM.current.res, LiftCore.DEFAULT_LIMITS, {}).filter(c => c.id === 'vibz')[0].cfg; return { n: c.series.length, jz: c.series[1] && c.series[1].label, pts: (c.points || []).map(p => p.shape), st: c.stats }; });
+  check('ISO Z chart: jerk zone series, + and o markers, Jerk Zone Max in title', iz.n === 2 && iz.jz === 'Jerk zone' && iz.pts.includes('plus') && iz.pts.includes('circle') && /Jerk zone Max Pk\/Pk/.test(iz.st), JSON.stringify(iz));
+  await shotEl(page, '[data-chart=vibz]', '04b_iso_jerkzone_mobile.png');
+  await page.click('#cmIso'); await page.waitForTimeout(150);
+  check('ISO filter button again = unfiltered', /unfiltered/.test(await lbl()));
   await page.click('#cmIso'); await page.click('#clStack'); await page.waitForTimeout(200);
   const first = await page.evaluate(() => document.querySelector('#charts .chart-card').dataset.chart);
   check('stacked layout starts with sound (PMT order)', first === 'sound' && await page.evaluate(() => document.querySelector('#charts').classList.contains('stacked')), first);

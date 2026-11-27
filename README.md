@@ -1,8 +1,18 @@
-# লিফট রাইড টেস্ট (Lift Ride Test) — v2.2.0
+# লিফট রাইড টেস্ট (Lift Ride Test) — v2.2.1
 
 ফোনের sensor ও মাইক্রোফোন দিয়ে লিফটের **speed, travel height, vibration, jerk ও sound level** মাপা ও বিশ্লেষণের অ্যাপ (Android APK + PC সংস্করণ)। লক্ষ্য: দৈনন্দিন screening ও troubleshooting-এ PMT EVA-র বিকল্প। এই সংস্করণ **ISO 18738:2003** পদ্ধতি অনুযায়ী, অ্যাপের ভাষা **ইংরেজি**, এবং **শুধু accelerometer দিয়েই** পুরো মাপ চলে (barometer ঐচ্ছিক)।
 
 *Design & Developed by Md. Saiful Islam*
+
+**v2.2.1-এ নতুন (PMT EVA-র সঙ্গে আসল তুলনার পর):**
+
+- **X / Y অক্ষ সংশোধন:** ফোনের উপরের দিক দরজার দিকে রাখলে আগে X আর Y উল্টো আসত। এখন ISO 18738 অনুযায়ী X = সামনে-পিছনে (দরজার দিকে), Y = পাশাপাশি। Measure-এ **Phone top edge points to** দিয়ে দিক বদলানো যায়। পুরোনো রেকর্ড খুললে নতুন নিয়মে আবার হিসাব হয়।
+- **Jerk zone:** চলা শুরুর ১ সেকেন্ড আগের আর থামার ১ সেকেন্ড পরের ঝাঁকুনিও (brake খোলা / বন্ধ) এখন jerk zone-এ গোনা হয়, PMT-র মতো। আসল 4 m/s UP রানে এই ঝাঁকুনি 35.8 mg, PMT দেখিয়েছিল 35.9 mg।
+- **চার্ট প্রথমে Unfiltered খোলে** (PMT-র মতো)। **Apply ISO filter** চাপলে ISO-weighted, সীমা-রেখা, jerk zone আলাদা রঙে, + (max Pk-Pk) ও o (jerk-zone max) চিহ্ন আর "Jerk zone Max Pk/Pk" দেখায়। আবার চাপলে raw।
+- **নতুন UI:** প্রতিটি ঘর ও বোতামের নিচে ব্যবহারের নির্দেশনা, PC-তে দুই কলামের বিন্যাস, টেবিলের মান শিরোনামের ঠিক নিচে।
+- **GitHub Actions:** সব action Node 24 সংস্করণে (checkout v6, setup-node v6, setup-java v5, upload-artifact v6, configure-pages v6, upload-pages-artifact v5, deploy-pages v5)। হলুদ Node 20 সতর্কতা আর আসবে না।
+
+**প্রয়োগ (v2.2.1):** zip-এর ভেতরের সব ফাইল repo-র মূল পাতায় আপলোড করে Commit করুন। তারপর `.github/workflows/build-apk.yml` ও `pages.yml` খুলে পেন্সিল চেপে আলাদা পাঠানো দুই ফাইলের লেখা বসান। Build APK সবুজ হলে ফোনে "Update available" আসবে (uninstall লাগবে না)। `Code.gs` বদলানোর দরকার নেই।
 
 **v2.2.0-এ নতুন (বিস্তারিত অংশ ক২-তে):**
 
@@ -429,6 +439,9 @@ repo আগে থেকে থাকলে নতুন repo বানাতে
 | ✅ ধাপ ২: `নেই: .java-version` | একই কারণ: লুকানো ফাইল বাদ পড়েছে | **Add file → Create new file**, নাম `.java-version`, ভেতরে `21` |
 | ✅ Sensor check "Keep the phone flat…"-এ আটকে থাকে | v2.0.0-এ native `start()` উত্তর না দিলে অপেক্ষা চলতেই থাকত | v2.0.1 থেকে ঠিক: সময়সীমা আছে, ধাপের নাম দেখায়, দরকারে WebView sensor-এ চলে যায় |
 | ✅ Pages: `Found 0 artifact(s)` / `No artifacts named "github-pages"` | `pages.yml`-এ ফাইল তোলা ও প্রকাশ একই job-এ ছিল | v2.1.1 থেকে দুই job (`build`, তারপর `deploy`) এবং `actions: read` অনুমতি। নতুন `pages.yml` দিয়ে বদলান |
+| ✅ PMT-র সঙ্গে তুলনায় X ও Y উল্টো, বা 4 m/s-এ এক অক্ষ PMT-র চেয়ে অনেক বেশি | v2.2.0 পর্যন্ত X নেওয়া হতো ফোনের ছোট দিক থেকে, যা উপরের দিক দরজার দিকে রাখলে আসলে পাশাপাশি | v2.2.1 থেকে ঠিক। Measure-এ **Phone top edge points to** ঠিক বাছুন, আর PMT সেন্সরের X-তীরও দরজার দিকে রাখুন |
+| ✅ PMT-র "Jerk Zone Max Pk/Pk" অ্যাপের চেয়ে বেশি | চলা শুরুর আগের brake-খোলার ঝাঁকুনি অ্যাপ কোনো অঞ্চলে গুনত না | v2.2.1 থেকে চলা শুরুর ১ s আগে ও থামার ১ s পরে jerk zone-এ ধরা হয় |
+| 4 m/s-এ Z বা পাশাপাশি কম্পন PMT-র চেয়ে ৪০–৬০ % বেশি (সামনে-পিছনে মেলে) | ফোন আর PMT মেঝের আলাদা জায়গায়, বা হালকা ফোন মেঝের আবরণে দোলে | ফোন PMT-র একদম পাশে, কভার ছাড়া, শক্ত মেঝেতে রাখুন; একবার double-sided tape দিয়ে আটকে মাপুন |
 | ফোনে "Update available" আসে না | Signing key secrets নেই, তাই Release প্রকাশ হয়নি (Actions সারাংশে ⚠), অথবা অ্যাপটি পুরোনো debug APK | অংশ ক২-এর ধাপ ২ ও ৩। Releases পাতায় সর্বশেষ APK আছে কি না দেখুন। More → **Check for updates** চাপলে কারণ লেখা আসে |
 | ধাপ 14b: `Release প্রকাশ ব্যর্থ` / `403` | Workflow-এর token-এর লেখার অনুমতি নেই | **Settings → Actions → General → Workflow permissions → Read and write → Save**, তারপর আবার চালান |
 | আপডেট ইনস্টলে "App not installed" | ফোনের অ্যাপ অন্য চাবিতে sign করা (পুরোনো debug APK) | একবার uninstall করে Releases-এর APK বসান। এরপর আর হবে না |
@@ -487,6 +500,8 @@ repo আগে থেকে থাকলে নতুন repo বানাতে
 ## ১২. যা যাচাই করা হয়েছে ও যা হয়নি
 
 **যাচাই হয়েছে (আমার কম্পিউটারে):**
+
+- **v2.2.1:** আপনার পাঠানো আসল ৪টি CSV PMT-র ৫টি PDF-এর সঙ্গে মিলিয়ে দেখা হয়েছে। নতুন পরীক্ষা: দরজার দিকে / পাশের দেয়ালের দিকে X-Y, শুরুর আগের ঝাঁকুনি jerk zone-এ, + ও o চিহ্নের অবস্থান, Apply ISO filter বোতাম। সব পুরোনো পরীক্ষাও পাস। PC ও মোবাইল, light ও dark screenshot আর PDF-এর curve পাতা চোখে দেখা হয়েছে। নতুন action সংস্করণগুলো (Node 24) আসল GitHub-এ এখনো চালানো হয়নি।
 
 - `tests/core.test.js`: ISO 2631-1 weighting (published dB মানের সাথে), 10 Hz filter (−3 dB at 10 Hz), Annex A (sine → pk-pk = 2A), 0.5 s LSQ ঢাল, boundary 0.5 m, Annex B region, সিমুলেটেড লিফট (barometer সহ/ছাড়া, উপরে/নিচে, noise, ১২টি এলোমেলো লিফট), bump সময়/অবস্থান, roller guide কম্পাঙ্ক, ঝাঁকানো ফোন, লিফট না চললে ত্রুটি, sensor check — সব পাস।
 - `tests/e2e.js`: Chromium-এ পুরো অ্যাপ (ইংরেজি UI যাচাই, রেকর্ডিং, ISO টেবিল, ১০টি চার্ট, PDF ৪ পাতা, CSV, UP/DOWN ট্র্যাকিং, sensor check, সীমা বদল, উচ্চতা সংশোধন, light/dark, মোবাইল/ডেস্কটপ screenshot) — সব পাস; PDF-এর পাতাগুলো ছবি করে চোখে দেখা হয়েছে।
